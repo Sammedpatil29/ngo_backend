@@ -114,3 +114,153 @@ Base URL: `http://localhost:3000/api`
 - **URL:** `/team-members/:id`
 - **Method:** `DELETE`
 - **Description:** Removes a team member.
+
+---
+
+## Banners
+
+### Get All Banners
+- **URL:** `/banners`
+- **Method:** `GET`
+- **Description:** Retrieves a list of all banners.
+
+### Get Banner by ID
+- **URL:** `/banners/:id`
+- **Method:** `GET`
+- **Description:** Retrieves a specific banner by ID.
+
+### Create Banner
+- **URL:** `/banners`
+- **Method:** `POST`
+- **Description:** Adds a new banner.
+- **Request Body:**
+  ```json
+  {
+    "title": "Welcome",
+    "highlight": "To our NGO",
+    "image": "http://example.com/banner.jpg",
+    "isActive": true
+  }
+  ```
+
+### Update Banner
+- **URL:** `/banners/:id`
+- **Method:** `PUT`
+- **Description:** Updates an existing banner.
+
+### Delete Banner
+- **URL:** `/banners/:id`
+- **Method:** `DELETE`
+- **Description:** Removes a banner.
+
+---
+
+## Services
+
+### Get All Services
+- **URL:** `/services`
+- **Method:** `GET`
+- **Description:** Retrieves a list of all services.
+
+### Get Service by ID
+- **URL:** `/services/:id`
+- **Method:** `GET`
+- **Description:** Retrieves a specific service by ID.
+
+### Create Service
+- **URL:** `/services`
+- **Method:** `POST`
+- **Description:** Adds a new service.
+- **Request Body:**
+  ```json
+  {
+    "title": "Education",
+    "description": "Providing education to children.",
+    "image": "http://example.com/service.jpg",
+    "isActive": true
+  }
+  ```
+
+### Update Service
+- **URL:** `/services/:id`
+- **Method:** `PUT`
+- **Description:** Updates an existing service.
+
+### Delete Service
+- **URL:** `/services/:id`
+- **Method:** `DELETE`
+- **Description:** Removes a service.
+
+---
+
+## News
+
+### Get All News
+- **URL:** `/news`
+- **Method:** `GET`
+- **Description:** Retrieves a list of all news items.
+
+### Get News by ID
+- **URL:** `/news/:id`
+- **Method:** `GET`
+- **Description:** Retrieves a specific news item by ID.
+
+### Create News
+- **URL:** `/news`
+- **Method:** `POST`
+- **Description:** Adds a new news item.
+- **Request Body:**
+  ```json
+  {
+    "title": "New Event",
+    "image": "http://example.com/news.jpg",
+    "isActive": true
+  }
+  ```
+
+### Update News
+- **URL:** `/news/:id`
+- **Method:** `PUT`
+- **Description:** Updates an existing news item.
+
+### Delete News
+- **URL:** `/news/:id`
+- **Method:** `DELETE`
+- **Description:** Removes a news item.
+
+---
+
+## Media
+
+### Get All Media
+- **URL:** `/media`
+- **Method:** `GET`
+- **Description:** Retrieves a list of all media items.
+
+### Get Media by ID
+- **URL:** `/media/:id`
+- **Method:** `GET`
+- **Description:** Retrieves a specific media item by ID.
+
+### Create Media
+- **URL:** `/media`
+- **Method:** `POST`
+- **Description:** Adds a new media item.
+- **Request Body:**
+  ```json
+  {
+    "place": "Community Center",
+    "url": "http://example.com/photo.jpg",
+    "isActive": true
+  }
+  ```
+
+### Update Media
+- **URL:** `/media/:id`
+- **Method:** `PUT`
+- **Description:** Updates an existing media item.
+
+### Delete Media
+- **URL:** `/media/:id`
+- **Method:** `DELETE`
+- **Description:** Removes a media item.
