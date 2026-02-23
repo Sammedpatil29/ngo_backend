@@ -4,7 +4,7 @@ Base URL: `http://localhost:3000/api`
 
 ## Users
 
-### Get All Users
+### Get All User
 - **URL:** `/users`
 - **Method:** `GET`
 - **Description:** Retrieves a list of all registered users.
