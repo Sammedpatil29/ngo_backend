@@ -28,6 +28,21 @@ Base URL: `http://localhost:3000/api`
   - **Code:** 201 Created
   - **Content:** `{ "id": 1, "name": "John Doe", ... }`
 
+### Login User
+- **URL:** `/users/login`
+- **Method:** `POST`
+- **Description:** Authenticates a user and returns a JWT token.
+- **Request Body:**
+  ```json
+  {
+    "email": "john@example.com",
+    "password": "securepassword"
+  }
+  ```
+- **Success Response:**
+  - **Code:** 200 OK
+  - **Content:** `{ "message": "Login successful", "token": "...", "user": {...} }`
+
 ---
 
 ## Volunteers
@@ -264,3 +279,23 @@ Base URL: `http://localhost:3000/api`
 - **URL:** `/media/:id`
 - **Method:** `DELETE`
 - **Description:** Removes a media item.
+
+---
+
+## Home
+
+### Get Home Data
+- **URL:** `/home`
+- **Method:** `GET`
+- **Description:** Retrieves aggregated data for the home page including banners, services, team members, and news.
+- **Success Response:**
+  - **Code:** 200 OK
+  - **Content:**
+    ```json
+    {
+      "banners": [...],
+      "services": [...],
+      "teamMembers": [...],
+      "news": [...]
+    }
+    ```
