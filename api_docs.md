@@ -343,6 +343,25 @@ Base URL: `http://localhost:3000/api`
 - **Success Response:**
   - **Code:** 200 OK
 
+### Get Donation by Phone
+- **URL:** `/donations/phone/:phone`
+- **Method:** `GET`
+- **Description:** Retrieves the name and email for the latest donation associated with a given phone number.
+- **URL Params:**
+  - `phone=[string]` (Required)
+- **Success Response:**
+  - **Code:** 200 OK
+  - **Content:**
+    ```json
+    {
+      "donorName": "John Doe",
+      "email": "john@example.com"
+    }
+    ```
+- **Error Response:**
+  - **Code:** 404 Not Found
+  - **Content:** `{ "message": "No donation found with that phone number." }`
+
 ---
 
 ## General Upload

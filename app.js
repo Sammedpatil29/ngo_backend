@@ -20,32 +20,29 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '50mb' }));
 
-const allowedOrigin = 'https://ngo-navy.vercel.app';
+// const allowedOrigin = 'https://ngo-navy.vercel.app';
 
-const originBlocker = (req, res, next) => {
-  const origin = req.headers.origin;
+// const originBlocker = (req, res, next) => {
+//   const origin = req.headers.origin;
 
-  // 1. Block if no origin is present (blocks default Postman/curl)
-  if (!origin) {
-    return res.status(403).json({ 
-      error: 'Forbidden', 
-      message: 'Direct API access or non-browser requests are not allowed.' 
-    });
-  }
+//   if (!origin) {
+//     return res.status(403).json({ 
+//       error: 'Forbidden', 
+//       message: 'Direct API access or non-browser requests are not allowed.' 
+//     });
+//   }
 
-  // 2. Block if the origin doesn't match your Vercel Frontend
-  if (origin !== allowedOrigin) {
-    return res.status(403).json({ 
-      error: 'Forbidden', 
-      message: 'Request not allowed from this origin.' 
-    });
-  }
+//   if (origin !== allowedOrigin) {
+//     return res.status(403).json({ 
+//       error: 'Forbidden', 
+//       message: 'Request not allowed from this origin.' 
+//     });
+//   }
 
-  next(); // Origin is valid, proceed to the route
-};
+//   next(); // Origin is valid, proceed to the route
+// };
 
-// Apply globally to all routes
-app.use(originBlocker);
+// app.use(originBlocker);
 
 // Database Connection
 // Routes
@@ -60,7 +57,7 @@ app.use('/api/home', homeRoutes);
 app.use('/api/donations', donationRoutes);
 
 sequelize
-  .sync()
+  .sync({ alter: true })
   .then(() => {
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   })

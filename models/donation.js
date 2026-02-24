@@ -23,6 +23,10 @@ const Donation = sequelize.define('donation', {
     type: Sequelize.STRING,
     allowNull: true
   },
+  city: {
+    type: Sequelize.STRING,
+    allowNull: true
+  },
   isBloodDonor: {
     type: Sequelize.BOOLEAN,
     defaultValue: false
