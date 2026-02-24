@@ -23,10 +23,10 @@ if (admin.apps.length === 0) {
 exports.getHomeData = async (req, res) => {
   try {
     const [banners, services, teamMembers, news] = await Promise.all([
-      Banner.findAll(),
-      Service.findAll(),
-      TeamMember.findAll(),
-      News.findAll()
+      Banner.findAll({ where: { isActive: true } }),
+      Service.findAll({ where: { isActive: true } }),
+      TeamMember.findAll({ where: { isActive: true } }),
+      News.findAll({ where: { isActive: true } })
     ]);
 
     res.status(200).json({
