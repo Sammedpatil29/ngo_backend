@@ -1,4 +1,20 @@
 const Banner = require('../models/bannerModel');
+const admin = require('firebase-admin');
+
+let serviceAccount;
+try {
+  serviceAccount = require('../may-i-help-you-foundation-firebase-adminsdk-fbsvc-70cfe5cb12.json');
+} catch (e) {
+  // Service account not found, falling back to default credentials
+}
+
+// Initialize Firebase Admin if not already initialized
+if (admin.apps.length === 0) {
+  admin.initializeApp({
+    credential: serviceAccount ? admin.credential.cert(serviceAccount) : admin.credential.applicationDefault(),
+    storageBucket: 'may-i-help-you-foundation.firebasestorage.app'
+  });
+}
 
 // Create a new banner
 exports.createBanner = async (req, res) => {
@@ -51,10 +67,22 @@ exports.updateBanner = async (req, res) => {
 // Delete a banner
 exports.deleteBanner = async (req, res) => {
   try {
-    const deleted = await Banner.destroy({
-      where: { id: req.params.id }
-    });
-    if (deleted) {
+    const banner = await Banner.findByPk(req.params.id);
+
+    if (banner) {
+      // Delete image from Firebase Storage
+      if (banner.image) {
+        try {
+          const bucket = admin.storage().bucket();
+          const filename = banner.image.split('/').pop();
+          if (filename) {
+            await bucket.file(filename).delete();
+          }
+        } catch (err) {
+          console.error('Error deleting image:', err);
+        }
+      }
+      await banner.destroy();
       res.status(204).send();
     } else {
       res.status(404).json({ message: 'Banner not found' });

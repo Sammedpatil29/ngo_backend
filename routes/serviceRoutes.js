@@ -4,6 +4,7 @@ const serviceController = require('../controllers/serviceController');
 
 router.post('/', serviceController.createService);
 router.get('/', serviceController.getAllServices);
+router.get('/active', serviceController.getActiveServices);
 router.get('/:id', serviceController.getServiceById);
 router.put('/:id', serviceController.updateService);
 router.delete('/:id', serviceController.deleteService);
