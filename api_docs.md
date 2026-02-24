@@ -299,3 +299,60 @@ Base URL: `http://localhost:3000/api`
       "news": [...]
     }
     ```
+
+### Upload Home Image
+- **URL:** `/home/upload`
+- **Method:** `POST`
+- **Description:** Uploads an image to cloud storage via the home route.
+- **Form Data:**
+  - `image`: File
+- **Success Response:**
+  - **Code:** 200 OK
+  - **Content:** `{ "data": "https://storage.googleapis.com/..." }`
+
+---
+
+## Donations
+
+### Create Donation
+- **URL:** `/donations`
+- **Method:** `POST`
+- **Description:** Records a new donation.
+- **Request Body:**
+  ```json
+  {
+    "donorName": "John Doe",
+    "email": "john@example.com",
+    "phone": "+1234567890",
+    "amount": 500.00,
+    "currency": "INR",
+    "message": "Keep up the good work!",
+    "transactionId": "txn_12345",
+    "paymentStatus": "completed",
+    "isBloodDonor": true,
+    "bloodGroup": "O+"
+  }
+  ```
+- **Success Response:**
+  - **Code:** 201 Created
+
+### Get All Donations
+- **URL:** `/donations`
+- **Method:** `GET`
+- **Description:** Retrieves a list of all donations.
+- **Success Response:**
+  - **Code:** 200 OK
+
+---
+
+## General Upload
+
+### Upload Image
+- **URL:** `/upload`
+- **Method:** `POST`
+- **Description:** General endpoint to upload an image to cloud storage.
+- **Form Data:**
+  - `image`: File
+- **Success Response:**
+  - **Code:** 200 OK
+  - **Content:** `{ "url": "https://storage.googleapis.com/..." }`

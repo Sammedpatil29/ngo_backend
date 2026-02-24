@@ -9,13 +9,14 @@ const serviceRoutes = require('./routes/serviceRoutes');
 const newsRoutes = require('./routes/newsRoutes');
 const mediaRoutes = require('./routes/mediaRoutes');
 const homeRoutes = require('./routes/homeRoutes');
+const donationRoutes = require('./routes/donationRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb' }));
 
 // Database Connection
 // Routes
@@ -27,6 +28,7 @@ app.use('/api/services', serviceRoutes);
 app.use('/api/news', newsRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/home', homeRoutes);
+app.use('/api/donations', donationRoutes);
 
 sequelize
   .sync()
