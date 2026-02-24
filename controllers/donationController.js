@@ -1,9 +1,35 @@
 const Donation = require('../models/donation');
+const Donor = require('../models/donor');
 
 // POST /api/donations - Create a new donation record
 exports.createDonation = async (req, res) => {
   try {
     const { donorName, email, phone, city, amount, currency, message, transactionId, paymentStatus, isBloodDonor, bloodGroup } = req.body;
+
+    if (phone) {
+      try {
+        const existingDonor = await Donor.findOne({ where: { phone } });
+        const donorData = {
+          name: donorName,
+          email,
+          city,
+          isBloodDonor,
+          bloodGroup
+        };
+
+        if (existingDonor) {
+          await existingDonor.update(donorData);
+        } else {
+          await Donor.create({
+            ...donorData,
+            phone
+          });
+        }
+      } catch (error) {
+        console.error('Error updating/creating donor:', error);
+        // Continue with donation creation even if donor logic fails
+      }
+    }
 
     const newDonation = await Donation.create({
       donorName,
@@ -47,7 +73,7 @@ exports.getDonationByPhone = async (req, res) => {
             return res.status(400).json({ message: 'Phone number is required.' });
         }
 
-        const donation = await Donation.findOne({
+        const donation = await Donor.findOne({
             where: { phone: phone },
             order: [['createdAt', 'DESC']] // Get the latest donation for that number
         });
@@ -67,4 +93,13 @@ exports.getDonationByPhone = async (req, res) => {
         console.error('Error fetching donation by phone:', error);
         res.status(500).json({ error: 'Failed to fetch donation data', details: error.message });
     }
+};
+
+exports.getDonorsList = async (req, res) => {
+  try {
+    const donors = await Donor.findAll({ order: [['createdAt', 'DESC']] });
+    res.json(donors);
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch donors list' });
+  }
 };
