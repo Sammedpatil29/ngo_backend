@@ -2,6 +2,7 @@ const Donation = require('../models/donation');
 const Donor = require('../models/donor');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
+const nodemailer = require('nodemailer');
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_S5RLYqr6y2I6xs',
@@ -156,8 +157,12 @@ exports.verifyPayment = async (req, res) => {
       } catch (error) {
         console.error('Error capturing payment:', error);
       }
-      donation.paymentStatus = 'completed';
-      await donation.save();
+
+      if (donation.paymentStatus !== 'completed') {
+        donation.paymentStatus = 'completed';
+        await donation.save();
+        // await sendThankYouEmail(donation);
+      }
       res.json({ status: 'success', message: 'Payment verified successfully' });
     } else {
       donation.paymentStatus = 'failed';
@@ -185,6 +190,7 @@ exports.checkPaymentStatus = async (req, res) => {
       if (order.status === 'paid') {
         donation.paymentStatus = 'completed';
         await donation.save();
+        // await sendThankYouEmail(donation);
       }
     }
 
@@ -192,6 +198,73 @@ exports.checkPaymentStatus = async (req, res) => {
   } catch (error) {
     console.error('Error checking payment status:', error);
     res.status(500).json({ error: 'Failed to check status', details: error.message });
+  }
+};
+
+// Helper function to send thank you email
+const sendThankYouEmail = async (donation) => {
+  try {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER || 'sammed.patil29@gmail.com',
+        pass: process.env.EMAIL_PASS || 'dxjw yrxh vpox ndtx'
+      }
+    });
+
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'sammed.patil29@gmail.com',
+      to: donation.email,
+      subject: 'Thank You for Your Donation',
+      html: `
+<link href="https://fonts.googleapis.com/css2?family=Anek+Telugu:wght@400;700&family=Luckiest+Guy&display=swap" rel="stylesheet">
+<link href="https://fonts.cdnfonts.com/css/cooper-black" rel="stylesheet">
+<div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; border: 1px solid #f0f0f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+  
+  <div style="background-color: white; padding: 25px 30px; text-align: center;">
+    <img src="https://storage.googleapis.com/may-i-help-you-foundation.firebasestorage.app/1772039322429-upload.png" alt="May I Help You Foundation Logo" style="width: 120px; height: auto; margin-bottom: 10px; border-radius: 50%;">
+    
+    <h1 style="font-family: 'Cooper Black', serif; color: #D81B60; margin: 0; font-size: 26px; text-transform: uppercase; letter-spacing: 1px;">
+      May I Help You Foundation
+    </h1>
+  </div>
+
+  <div style="padding: 40px; color: #333; line-height: 1.6;">
+    <h2 style="color: #D81B60; margin-top: 0; "><span style="font-family: luckiest guy, anek telugu, sans-serif">ధన్యవాదాలు </span>(Thank You), ${donation.donorName}!</h2>
+    
+    <p style="font-size: 16px;font-family: luckiest guy, anek telugu, sans-serif">మీ ఉదారతకు మేము కృతజ్ఞతలు తెలుపుకుంటున్నాము.</p>
+    
+    <p style="font-size: 16px;">We have successfully received your generous contribution of:</p>
+    
+    <div style="background-color: #fce4ec; border-radius: 8px; padding: 20px; text-align: center; margin: 25px 0;">
+      <span style="font-size: 32px; font-weight: bold; color: #D81B60;">
+        ${donation.currency} ${donation.amount}
+      </span>
+    </div>
+
+    <div style="font-size: 14px; color: #666; border-top: 1px solid #eee; padding-top: 20px;">
+      <p><strong>Transaction ID:</strong> ${donation.transactionId}</p>
+    </div>
+
+    <p style="margin-top: 30px; font-size: 16px;">
+      Your support helps us empower the underprivileged through sustainable initiatives in education and healthcare.
+    </p>
+
+    <br>
+    <p style="margin: 0; font-weight: bold;">Best Regards,</p>
+    <p style="margin: 5px 0; color: #D81B60; font-weight: bold;">Team May I Help You Foundation</p>
+  </div>
+
+  <div style="background-color: #f9f9f9; padding: 20px; text-align: center; font-size: 12px; color: #999;">
+    <p>This is an automated receipt for your donation. Thank you for making a difference!</p>
+  </div>
+</div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error('Error sending thank you email:', error);
   }
 };
 
@@ -217,6 +290,7 @@ const initiatePaymentPolling = (orderId) => {
 
       if (order.status === 'paid') {
         await donation.update({ paymentStatus: 'completed' });
+        await sendThankYouEmail(donation);
         return;
       }
 
@@ -227,6 +301,7 @@ const initiatePaymentPolling = (orderId) => {
       if (authorizedPayment) {
         await razorpay.payments.capture(authorizedPayment.id, Math.round(donation.amount * 100), donation.currency || 'INR');
         await donation.update({ paymentStatus: 'completed' });
+        // await sendThankYouEmail(donation);
         return;
       }
 
