@@ -2,6 +2,7 @@ const Banner = require('../models/bannerModel');
 const Service = require('../models/serviceModel');
 const TeamMember = require('../models/teamMemberModel');
 const News = require('../models/newsModel');
+const Review = require('../models/reviewModel');
 const admin = require('firebase-admin');
 
 let serviceAccount;
@@ -22,18 +23,20 @@ if (admin.apps.length === 0) {
 
 exports.getHomeData = async (req, res) => {
   try {
-    const [banners, services, teamMembers, news] = await Promise.all([
+    const [banners, services, teamMembers, news, reviews] = await Promise.all([
       Banner.findAll({ where: { isActive: true } }),
       Service.findAll({ where: { isActive: true } }),
       TeamMember.findAll({ where: { isActive: true } }),
-      News.findAll({ where: { isActive: true } })
+      News.findAll({ where: { isActive: true } }),
+      Review.findAll({ where: { isActive: true } })
     ]);
 
     res.status(200).json({
       banners,
       services,
       teamMembers,
-      news
+      news,
+      reviews
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
