@@ -12,6 +12,7 @@ const mediaRoutes = require('./routes/mediaRoutes');
 const homeRoutes = require('./routes/homeRoutes');
 const donationRoutes = require('./routes/donationRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
+require('./cron/donationReminder');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
