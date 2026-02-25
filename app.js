@@ -11,6 +11,7 @@ const newsRoutes = require('./routes/newsRoutes');
 const mediaRoutes = require('./routes/mediaRoutes');
 const homeRoutes = require('./routes/homeRoutes');
 const donationRoutes = require('./routes/donationRoutes');
+const reviewRoutes = require('./routes/reviewRoutes');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -57,6 +58,7 @@ app.use('/api/news', newsRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/home', homeRoutes);
 app.use('/api/donations', donationRoutes);
+app.use('/api/reviews', reviewRoutes);
 
 sequelize
   .sync({ alter: true })
