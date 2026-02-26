@@ -1,377 +1,106 @@
 # API Documentation
 
-Base URL: `http://localhost:3000/api`
+Base URL: `/api` (Depending on your app configuration)
 
-## Users
+## Media (Gallery & Headers)
 
-### Get All User
-- **URL:** `/users`
-- **Method:** `GET`
-- **Description:** Retrieves a list of all registered users.
-- **Success Response:**
-  - **Code:** 200 OK
-  - **Content:** `[{ "id": 1, "name": "John", "email": "john@example.com", ... }]`
+The Media API has been restructured to organize images into categories (e.g., "Header Images", "Events").
 
-### Create User
-- **URL:** `/users`
-- **Method:** `POST`
-- **Description:** Creates a new user.
-- **Request Body:**
-  ```json
-  {
-    "name": "John Doe",
-    "email": "john@example.com",
-    "password": "securepassword"
-  }
-  ```
-- **Success Response:**
-  - **Code:** 201 Created
-  - **Content:** `{ "id": 1, "name": "John Doe", ... }`
+| Method | Endpoint | Description | Body / Notes |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/media` | Get all media categories with nested images | Returns the hierarchical JSON structure. |
+| `POST` | `/media/category` | Create a new media category | `{ "name": "Events", "url": "..." }` |
+| `PUT` | `/media/category/:id` | Update a category | `{ "name": "...", "url": "..." }` |
+| `DELETE` | `/media/category/:id` | Delete a category | Deletes the category. (Check cascade behavior for images). |
+| `POST` | `/media/image` | Add an image to a category | `{ "place": "...", "url": "...", "categoryId": 1 }` |
+| `PUT` | `/media/image/:id` | Update an image | `{ "place": "...", "url": "...", "isActive": true }` |
+| `DELETE` | `/media/image/:id` | Delete an image | - |
 
-### Login User
-- **URL:** `/users/login`
-- **Method:** `POST`
-- **Description:** Authenticates a user and returns a JWT token.
-- **Request Body:**
-  ```json
-  {
-    "email": "john@example.com",
-    "password": "securepassword"
-  }
-  ```
-- **Success Response:**
-  - **Code:** 200 OK
-  - **Content:** `{ "message": "Login successful", "token": "...", "user": {...} }`
+## Home & General
 
----
-
-## Volunteers
-
-### Get All Volunteers
-- **URL:** `/volunteers`
-- **Method:** `GET`
-- **Description:** Retrieves a list of all volunteers.
-- **Success Response:**
-  - **Code:** 200 OK
-
-### Get Volunteer by ID
-- **URL:** `/volunteers/:id`
-- **Method:** `GET`
-- **Description:** Retrieves a specific volunteer by their ID.
-- **Success Response:**
-  - **Code:** 200 OK
-- **Error Response:**
-  - **Code:** 404 Not Found
-
-### Create Volunteer
-- **URL:** `/volunteers`
-- **Method:** `POST`
-- **Description:** Adds a new volunteer.
-- **Request Body:**
-  ```json
-  {
-    "name": "Jane Smith",
-    "role": "Coordinator",
-    "image": "http://example.com/image.jpg",
-    "isActive": true
-  }
-  ```
-- **Success Response:**
-  - **Code:** 201 Created
-
-### Update Volunteer
-- **URL:** `/volunteers/:id`
-- **Method:** `PUT`
-- **Description:** Updates an existing volunteer's details.
-- **Request Body:** (Any combination of fields)
-  ```json
-  {
-    "role": "Senior Coordinator",
-    "isActive": false
-  }
-  ```
-- **Success Response:**
-  - **Code:** 200 OK
-
-### Delete Volunteer
-- **URL:** `/volunteers/:id`
-- **Method:** `DELETE`
-- **Description:** Removes a volunteer from the database.
-- **Success Response:**
-  - **Code:** 204 No Content
-
----
-
-## Team Members
-
-### Get All Team Members
-- **URL:** `/team-members`
-- **Method:** `GET`
-- **Description:** Retrieves a list of all team members.
-
-### Get Team Member by ID
-- **URL:** `/team-members/:id`
-- **Method:** `GET`
-- **Description:** Retrieves a specific team member by ID.
-
-### Create Team Member
-- **URL:** `/team-members`
-- **Method:** `POST`
-- **Description:** Adds a new team member.
-- **Request Body:** Similar to Volunteer model (name, role, image, isActive).
-
-### Update Team Member
-- **URL:** `/team-members/:id`
-- **Method:** `PUT`
-- **Description:** Updates an existing team member.
-
-### Delete Team Member
-- **URL:** `/team-members/:id`
-- **Method:** `DELETE`
-- **Description:** Removes a team member.
-
----
-
-## Banners
-
-### Get All Banners
-- **URL:** `/banners`
-- **Method:** `GET`
-- **Description:** Retrieves a list of all banners.
-
-### Get Banner by ID
-- **URL:** `/banners/:id`
-- **Method:** `GET`
-- **Description:** Retrieves a specific banner by ID.
-
-### Create Banner
-- **URL:** `/banners`
-- **Method:** `POST`
-- **Description:** Adds a new banner.
-- **Request Body:**
-  ```json
-  {
-    "title": "Welcome",
-    "highlight": "To our NGO",
-    "image": "http://example.com/banner.jpg",
-    "isActive": true
-  }
-  ```
-
-### Update Banner
-- **URL:** `/banners/:id`
-- **Method:** `PUT`
-- **Description:** Updates an existing banner.
-
-### Delete Banner
-- **URL:** `/banners/:id`
-- **Method:** `DELETE`
-- **Description:** Removes a banner.
-
----
-
-## Services
-
-### Get All Services
-- **URL:** `/services`
-- **Method:** `GET`
-- **Description:** Retrieves a list of all services.
-
-### Get Service by ID
-- **URL:** `/services/:id`
-- **Method:** `GET`
-- **Description:** Retrieves a specific service by ID.
-
-### Create Service
-- **URL:** `/services`
-- **Method:** `POST`
-- **Description:** Adds a new service.
-- **Request Body:**
-  ```json
-  {
-    "title": "Education",
-    "description": "Providing education to children.",
-    "image": "http://example.com/service.jpg",
-    "isActive": true
-  }
-  ```
-
-### Update Service
-- **URL:** `/services/:id`
-- **Method:** `PUT`
-- **Description:** Updates an existing service.
-
-### Delete Service
-- **URL:** `/services/:id`
-- **Method:** `DELETE`
-- **Description:** Removes a service.
-
----
-
-## News
-
-### Get All News
-- **URL:** `/news`
-- **Method:** `GET`
-- **Description:** Retrieves a list of all news items.
-
-### Get News by ID
-- **URL:** `/news/:id`
-- **Method:** `GET`
-- **Description:** Retrieves a specific news item by ID.
-
-### Create News
-- **URL:** `/news`
-- **Method:** `POST`
-- **Description:** Adds a new news item.
-- **Request Body:**
-  ```json
-  {
-    "title": "New Event",
-    "image": "http://example.com/news.jpg",
-    "isActive": true
-  }
-  ```
-
-### Update News
-- **URL:** `/news/:id`
-- **Method:** `PUT`
-- **Description:** Updates an existing news item.
-
-### Delete News
-- **URL:** `/news/:id`
-- **Method:** `DELETE`
-- **Description:** Removes a news item.
-
----
-
-## Media
-
-### Get All Media
-- **URL:** `/media`
-- **Method:** `GET`
-- **Description:** Retrieves a list of all media items.
-
-### Get Media by ID
-- **URL:** `/media/:id`
-- **Method:** `GET`
-- **Description:** Retrieves a specific media item by ID.
-
-### Create Media
-- **URL:** `/media`
-- **Method:** `POST`
-- **Description:** Adds a new media item.
-- **Request Body:**
-  ```json
-  {
-    "place": "Community Center",
-    "url": "http://example.com/photo.jpg",
-    "isActive": true
-  }
-  ```
-
-### Update Media
-- **URL:** `/media/:id`
-- **Method:** `PUT`
-- **Description:** Updates an existing media item.
-
-### Delete Media
-- **URL:** `/media/:id`
-- **Method:** `DELETE`
-- **Description:** Removes a media item.
-
----
-
-## Home
-
-### Get Home Data
-- **URL:** `/home`
-- **Method:** `GET`
-- **Description:** Retrieves aggregated data for the home page including banners, services, team members, and news.
-- **Success Response:**
-  - **Code:** 200 OK
-  - **Content:**
-    ```json
-    {
-      "banners": [...],
-      "services": [...],
-      "teamMembers": [...],
-      "news": [...]
-    }
-    ```
-
-### Upload Home Image
-- **URL:** `/home/upload`
-- **Method:** `POST`
-- **Description:** Uploads an image to cloud storage via the home route.
-- **Form Data:**
-  - `image`: File
-- **Success Response:**
-  - **Code:** 200 OK
-  - **Content:** `{ "data": "https://storage.googleapis.com/..." }`
-
----
+| Method | Endpoint | Description | Body / Notes |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/home` | Get aggregated data for homepage | Returns Banners, Services, Team, News, and Reviews. |
+| `POST` | `/home/upload` | Upload an image file | `multipart/form-data` with key `image`. Returns public URL. |
 
 ## Donations
 
-### Create Donation
-- **URL:** `/donations`
-- **Method:** `POST`
-- **Description:** Records a new donation.
-- **Request Body:**
-  ```json
-  {
-    "donorName": "John Doe",
-    "email": "john@example.com",
-    "phone": "+1234567890",
-    "amount": 500.00,
-    "currency": "INR",
-    "message": "Keep up the good work!",
-    "transactionId": "txn_12345",
-    "paymentStatus": "completed",
-    "isBloodDonor": true,
-    "bloodGroup": "O+"
-  }
-  ```
-- **Success Response:**
-  - **Code:** 201 Created
+| Method | Endpoint | Description | Body / Notes |
+| :--- | :--- | :--- | :--- |
+| `POST` | `/donations` | Create a donation order | `{ "donorName": "...", "amount": 100, "email": "...", "phone": "..." }` |
+| `GET` | `/donations` | Get all donations | - |
+| `GET` | `/donations/donors` | Get list of unique donors | - |
+| `GET` | `/donations/phone/:phone` | Get donor details by phone | - |
+| `POST` | `/donations/verify` | Verify Razorpay payment | `{ "razorpay_order_id": "...", "razorpay_payment_id": "...", "razorpay_signature": "..." }` |
+| `GET` | `/donations/status/:orderId`| Check payment status | - |
 
-### Get All Donations
-- **URL:** `/donations`
-- **Method:** `GET`
-- **Description:** Retrieves a list of all donations.
-- **Success Response:**
-  - **Code:** 200 OK
+## News
 
-### Get Donation by Phone
-- **URL:** `/donations/phone/:phone`
-- **Method:** `GET`
-- **Description:** Retrieves the name and email for the latest donation associated with a given phone number.
-- **URL Params:**
-  - `phone=[string]` (Required)
-- **Success Response:**
-  - **Code:** 200 OK
-  - **Content:**
-    ```json
-    {
-      "donorName": "John Doe",
-      "email": "john@example.com"
-    }
-    ```
-- **Error Response:**
-  - **Code:** 404 Not Found
-  - **Content:** `{ "message": "No donation found with that phone number." }`
+| Method | Endpoint | Description | Body / Notes |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/news` | Get all news items | - |
+| `GET` | `/news/:id` | Get news by ID | - |
+| `POST` | `/news` | Create news item | `{ "title": "...", "description": "...", "image": "..." }` |
+| `PUT` | `/news/:id` | Update news item | - |
+| `DELETE` | `/news/:id` | Delete news item | - |
 
----
+## Services
 
-## General Upload
+| Method | Endpoint | Description | Body / Notes |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/services` | Get all services | - |
+| `GET` | `/services/active` | Get active services | - |
+| `GET` | `/services/:id` | Get service by ID | - |
+| `POST` | `/services` | Create service | `{ "title": "...", "description": "...", "image": "..." }` |
+| `PUT` | `/services/:id` | Update service | - |
+| `DELETE` | `/services/:id` | Delete service | - |
 
-### Upload Image
-- **URL:** `/upload`
-- **Method:** `POST`
-- **Description:** General endpoint to upload an image to cloud storage.
-- **Form Data:**
-  - `image`: File
-- **Success Response:**
-  - **Code:** 200 OK
-  - **Content:** `{ "url": "https://storage.googleapis.com/..." }`
+## Reviews
+
+| Method | Endpoint | Description | Body / Notes |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/reviews` | Get all reviews | - |
+| `GET` | `/reviews/active` | Get active reviews | - |
+| `GET` | `/reviews/:id` | Get review by ID | - |
+| `POST` | `/reviews` | Create review | `{ "name": "...", "ratings": 5, "comment": "..." }` |
+| `PUT` | `/reviews/:id` | Update review | - |
+| `DELETE` | `/reviews/:id` | Delete review | - |
+
+## Volunteers
+
+| Method | Endpoint | Description | Body / Notes |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/volunteers` | Get all volunteers | - |
+| `GET` | `/volunteers/active` | Get active volunteers | - |
+| `GET` | `/volunteers/:id` | Get volunteer by ID | - |
+| `POST` | `/volunteers` | Create volunteer | `{ "name": "...", "role": "...", "image": "..." }` |
+| `PUT` | `/volunteers/:id` | Update volunteer | - |
+| `DELETE` | `/volunteers/:id` | Delete volunteer | - |
+
+## Banners
+
+| Method | Endpoint | Description | Body / Notes |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/banners` | Get all banners | - |
+| `GET` | `/banners/:id` | Get banner by ID | - |
+| `POST` | `/banners` | Create banner | `{ "title": "...", "image": "...", "highlight": "..." }` |
+| `PUT` | `/banners/:id` | Update banner | - |
+| `DELETE` | `/banners/:id` | Delete banner | - |
+
+## Team Members
+
+| Method | Endpoint | Description | Body / Notes |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/team-members` | Get all team members | - |
+| `GET` | `/team-members/:id` | Get team member by ID | - |
+| `POST` | `/team-members` | Create team member | `{ "name": "...", "role": "...", "image": "..." }` |
+| `PUT` | `/team-members/:id` | Update team member | - |
+| `DELETE` | `/team-members/:id` | Delete team member | - |
+
+## Users (Authentication)
+
+| Method | Endpoint | Description | Body / Notes |
+| :--- | :--- | :--- | :--- |
+| `GET` | `/users` | Get all users | - |
+| `POST` | `/users` | Register new user | `{ "name": "...", "email": "...", "password": "..." }` |
+| `POST` | `/users/login` | Login | `{ "email": "...", "password": "..." }` |

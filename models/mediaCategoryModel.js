@@ -1,29 +1,21 @@
 const Sequelize = require('sequelize');
 const sequelize = require('../database');
 
-const Media = sequelize.define('media', {
+const MediaCategory = sequelize.define('mediaCategory', {
   id: {
     type: Sequelize.INTEGER,
     autoIncrement: true,
     allowNull: false,
     primaryKey: true
   },
-  place: {
+  name: {
     type: Sequelize.STRING,
     allowNull: false
   },
   url: {
     type: Sequelize.STRING,
     allowNull: false
-  },
-  isActive: {
-    type: Sequelize.BOOLEAN,
-    defaultValue: true
-  },
-  categoryId: {
-    type: Sequelize.INTEGER,
-    allowNull: true
   }
 });
 
-module.exports = Media;
+module.exports = MediaCategory;

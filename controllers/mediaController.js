@@ -1,4 +1,5 @@
 const Media = require('../models/mediaModel');
+const MediaCategory = require('../models/mediaCategoryModel');
 const admin = require('firebase-admin');
 
 let serviceAccount;
@@ -16,9 +17,75 @@ if (admin.apps.length === 0) {
   });
 }
 
-// Create new media
-exports.createMedia = async (req, res) => {
+// Define Associations
+MediaCategory.hasMany(Media, { foreignKey: 'categoryId', as: 'images' });
+Media.belongsTo(MediaCategory, { foreignKey: 'categoryId' });
+
+// --- GET OVERALL DATA ---
+
+exports.getAllMedia = async (req, res) => {
   try {
+    const mediaData = await MediaCategory.findAll({
+      include: [{
+        model: Media,
+        as: 'images',
+        required: false
+      }]
+    });
+    res.status(200).json(mediaData);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// --- CATEGORY CRUD ---
+
+exports.createCategory = async (req, res) => {
+  try {
+    const category = await MediaCategory.create(req.body);
+    res.status(201).json(category);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+exports.updateCategory = async (req, res) => {
+  try {
+    const [updated] = await MediaCategory.update(req.body, {
+      where: { id: req.params.id }
+    });
+    if (updated) {
+      const updatedCategory = await MediaCategory.findByPk(req.params.id);
+      res.status(200).json(updatedCategory);
+    } else {
+      res.status(404).json({ message: 'Category not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+exports.deleteCategory = async (req, res) => {
+  try {
+    // Optional: Delete associated images first or rely on DB cascade
+    await Media.destroy({ where: { categoryId: req.params.id } });
+    const deleted = await MediaCategory.destroy({ where: { id: req.params.id } });
+    
+    if (deleted) {
+      res.status(200).json({ message: 'Category deleted successfully' });
+    } else {
+      res.status(404).json({ message: 'Category not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// --- IMAGE (MEDIA) CRUD ---
+
+exports.createImage = async (req, res) => {
+  try {
+    // Ensure categoryId is provided in req.body
     const media = await Media.create(req.body);
     res.status(201).json(media);
   } catch (error) {
@@ -26,29 +93,7 @@ exports.createMedia = async (req, res) => {
   }
 };
 
-// Get all media
-exports.getAllMedia = async (req, res) => {
-  try {
-    const mediaList = await Media.findAll();
-    res.status(200).json(mediaList);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// Get media by ID
-exports.getMediaById = async (req, res) => {
-  try {
-    const media = await Media.findByPk(req.params.id);
-    if (!media) return res.status(404).json({ message: 'Media not found' });
-    res.status(200).json(media);
-  } catch (error) {
-    res.status(500).json({ message: error.message });
-  }
-};
-
-// Update media
-exports.updateMedia = async (req, res) => {
+exports.updateImage = exports.updateMedia = async (req, res) => {
   try {
     const [updated] = await Media.update(req.body, {
       where: { id: req.params.id }
@@ -64,8 +109,7 @@ exports.updateMedia = async (req, res) => {
   }
 };
 
-// Delete media
-exports.deleteMedia = async (req, res) => {
+exports.deleteImage = exports.deleteMedia = async (req, res) => {
   try {
     const media = await Media.findByPk(req.params.id);
 
