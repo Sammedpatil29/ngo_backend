@@ -7,8 +7,12 @@ const admin = require('firebase-admin');
 
 let serviceAccount;
 try {
-  // This file is used for local development, it should not be deployed.
-  serviceAccount = require('../may-i-help-you-foundation-firebase-adminsdk-fbsvc-70cfe5cb12.json');
+  if (process.env.GCP_SERVICE_ACCOUNT_JSON) {
+    serviceAccount = JSON.parse(process.env.GCP_SERVICE_ACCOUNT_JSON);
+  } else {
+    // This file is used for local development, it should not be deployed.
+    serviceAccount = require('../may-i-help-you-foundation-firebase-adminsdk-fbsvc-70cfe5cb12.json');
+  }
 } catch (e) {
   console.warn("Warning: Could not load 'serviceAccountKey.json'. Ensure it is in the project root for local development.");
   // In production (Firebase), it will use default application credentials.
