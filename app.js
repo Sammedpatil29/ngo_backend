@@ -16,6 +16,10 @@ require('./cron/donationReminder');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const { Storage } = require('@google-cloud/storage');
+const storage = new Storage({
+  credentials: JSON.parse(process.env.GCP_SERVICE_ACCOUNT_JSON)
+});
 
 // Middleware
 // app.use(cors({
@@ -23,6 +27,7 @@ const PORT = process.env.PORT || 3000;
 // }));
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+
 
 // const allowedOrigin = 'https://ngo-navy.vercel.app';
 
