@@ -1,7 +1,9 @@
 const cron = require('node-cron');
 const nodemailer = require('nodemailer');
+const { Op } = require('sequelize');
 const Donor = require('../models/donor');
 const Donation = require('../models/donation');
+const { updateDonationPaymentStatus } = require('../controllers/donationController');
 
 // Configure email transporter
 const transporter = nodemailer.createTransport({
@@ -124,6 +126,42 @@ const sendReminderEmail = async () => {
     console.error('Error in donation reminder job:', error);
   }
 };
+
+const checkRecentPendingDonationsStatus = async () => {
+  console.log('Starting nightly payment status check for recent donations...');
+  try {
+    const sinceDate = new Date();
+    sinceDate.setDate(sinceDate.getDate() - 2);
+
+    const pendingDonations = await Donation.findAll({
+      where: {
+        paymentStatus: 'pending',
+        createdAt: {
+          [Op.gte]: sinceDate
+        }
+      }
+    });
+
+    if (!pendingDonations || pendingDonations.length === 0) {
+      console.log('No pending donations from the last 2 days found.');
+      return;
+    }
+
+    for (const donation of pendingDonations) {
+      try {
+        console.log(`Checking status for order ${donation.transactionId}`);
+        await updateDonationPaymentStatus(donation.transactionId);
+      } catch (error) {
+        console.error(`Failed to update status for order ${donation.transactionId}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error('Error checking recent pending donations:', error);
+  }
+};
+
+// Schedule the cron job to run every day at midnight
+cron.schedule('*/10 * * * * *', checkRecentPendingDonationsStatus);
 
 // Schedule the cron job to run every day at 10:00 AM
 cron.schedule('0 10 * * *', sendReminderEmail);
