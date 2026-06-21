@@ -62,8 +62,8 @@ exports.createDonation = async (req, res) => {
       bloodGroup
     });
 
-    // Start background polling to check payment status
-    initiatePaymentPolling(order.id);
+    // Schedule a delayed status check after 3 minutes
+    schedulePaymentStatusCheck(order.id);
 
     res.status(201).json({
       message: 'Donation recorded successfully',
@@ -161,12 +161,13 @@ exports.verifyPayment = async (req, res) => {
       if (donation.paymentStatus !== 'completed') {
         donation.paymentStatus = 'completed';
         await donation.save();
-        // await sendThankYouEmail(donation);
+        await sendPaymentStatusEmail(donation, 'completed');
       }
       res.json({ status: 'success', message: 'Payment verified successfully' });
     } else {
       donation.paymentStatus = 'failed';
       await donation.save();
+      await sendPaymentStatusEmail(donation, 'failed');
       res.status(400).json({ status: 'failure', message: 'Invalid signature' });
     }
   } catch (error) {
@@ -186,12 +187,8 @@ exports.checkPaymentStatus = async (req, res) => {
 
     // If still pending in DB, optionally check with Razorpay to be sure
     if (donation.paymentStatus === 'pending') {
-      const order = await razorpay.orders.fetch(orderId);
-      if (order.status === 'paid') {
-        donation.paymentStatus = 'completed';
-        await donation.save();
-        // await sendThankYouEmail(donation);
-      }
+      await updateDonationPaymentStatus(orderId);
+      await donation.reload();
     }
 
     res.json({ status: donation.paymentStatus });
@@ -268,50 +265,92 @@ const sendThankYouEmail = async (donation) => {
   }
 };
 
-// Helper function to poll payment status
-const initiatePaymentPolling = (orderId) => {
-  const pollInterval = 5000; // Check every 5 seconds
-  const maxDuration = 15 * 60 * 1000; // Stop after 15 minutes
-  const startTime = Date.now();
+const sendPaymentStatusEmail = async (donation, status) => {
+  if (!donation || !donation.email) return;
 
-  const poll = async () => {
-    try {
-      // Stop if timeout reached
-      if (Date.now() - startTime > maxDuration) return;
+  const subject = status === 'completed'
+    ? `Donation Payment Completed - ${donation.transactionId}`
+    : `Donation Payment Failed - ${donation.transactionId}`;
 
-      const donation = await Donation.findOne({ where: { transactionId: orderId } });
+  const statusMessage = status === 'completed'
+    ? 'Your payment has been completed successfully.'
+    : 'Your payment could not be completed. Please try again or contact support.';
 
-      // If donation is already completed or failed (e.g. via webhook or verify endpoint), stop polling
-      if (!donation || donation.paymentStatus === 'completed' || donation.paymentStatus === 'failed') {
-        return;
+  try {
+    const transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: process.env.EMAIL_USER || 'sammed.patil29@gmail.com',
+        pass: process.env.EMAIL_PASS || 'dxjw yrxh vpox ndtx'
       }
+    });
 
-      const order = await razorpay.orders.fetch(orderId);
+    const mailOptions = {
+      from: process.env.EMAIL_USER || 'sammed.patil29@gmail.com',
+      to: donation.email,
+      subject,
+      html: `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; padding: 25px; border: 1px solid #eee; border-radius: 12px; background: #fff;">
+          <h2 style="color: #D81B60;">${subject}</h2>
+          <p>Hello ${donation.donorName || 'Supporter'},</p>
+          <p>${statusMessage}</p>
+          <p><strong>Transaction ID:</strong> ${donation.transactionId}</p>
+          <p><strong>Amount:</strong> ${donation.currency} ${donation.amount}</p>
+          <p>If you have any questions, please reply to this email.</p>
+          <br />
+          <p>Best Regards,</p>
+          <p>Team May I Help You Foundation</p>
+        </div>
+      `
+    };
 
-      if (order.status === 'paid') {
-        await donation.update({ paymentStatus: 'completed' });
-        await sendThankYouEmail(donation);
-        return;
-      }
+    await transporter.sendMail(mailOptions);
+  } catch (error) {
+    console.error('Error sending payment status email:', error);
+  }
+};
 
-      // Check for authorized payments and capture them
+const updateDonationPaymentStatus = async (orderId) => {
+  const donation = await Donation.findOne({ where: { transactionId: orderId } });
+  if (!donation || donation.paymentStatus !== 'pending') return donation;
+
+  try {
+    const order = await razorpay.orders.fetch(orderId);
+    let newStatus = donation.paymentStatus;
+
+    if (order.status === 'paid') {
+      newStatus = 'completed';
+    } else {
       const payments = await razorpay.orders.fetchPayments(orderId);
-      const authorizedPayment = payments.items && payments.items.find(p => p.status === 'authorized');
+      const items = payments.items || [];
 
-      if (authorizedPayment) {
-        await razorpay.payments.capture(authorizedPayment.id, Math.round(donation.amount * 100), donation.currency || 'INR');
-        await donation.update({ paymentStatus: 'completed' });
-        // await sendThankYouEmail(donation);
-        return;
+      if (items.some(p => ['captured', 'paid', 'authorized'].includes(p.status))) {
+        newStatus = 'completed';
+      } else if (items.some(p => ['failed', 'cancelled'].includes(p.status))) {
+        newStatus = 'failed';
       }
-
-      // Continue polling
-      setTimeout(poll, pollInterval);
-    } catch (error) {
-      console.error(`Error polling payment status for order ${orderId}:`, error);
     }
-  };
 
-  // Start the polling loop
-  setTimeout(poll, pollInterval);
+    if (newStatus !== donation.paymentStatus) {
+      donation.paymentStatus = newStatus;
+      await donation.save();
+      await sendPaymentStatusEmail(donation, newStatus);
+    }
+  } catch (error) {
+    console.error(`Error updating payment status for order ${orderId}:`, error);
+  }
+
+  return donation;
+};
+
+exports.updateDonationPaymentStatus = updateDonationPaymentStatus;
+
+const schedulePaymentStatusCheck = (orderId, delayMs = 3 * 60 * 1000) => {
+  setTimeout(async () => {
+    try {
+      await updateDonationPaymentStatus(orderId);
+    } catch (error) {
+      console.error(`Error checking payment status for order ${orderId}:`, error);
+    }
+  }, delayMs);
 };
