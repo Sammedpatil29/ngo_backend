@@ -11,6 +11,7 @@ const newsRoutes = require('./routes/newsRoutes');
 const mediaRoutes = require('./routes/mediaRoutes');
 const homeRoutes = require('./routes/homeRoutes');
 const donationRoutes = require('./routes/donationRoutes');
+const donorRoutes = require('./routes/donorRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 require('./cron/donationReminder');
 
@@ -64,6 +65,7 @@ app.use('/api/news', newsRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/home', homeRoutes);
 app.use('/api/donations', donationRoutes);
+app.use('/api/donors', donorRoutes);
 app.use('/api/reviews', reviewRoutes);
 
 sequelize
