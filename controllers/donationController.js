@@ -81,9 +81,52 @@ exports.createDonation = async (req, res) => {
 exports.getAllDonations = async (req, res) => {
   try {
     const donations = await Donation.findAll({ order: [['createdAt', 'DESC']] });
-    res.json(donations);
+
+    // Calculate timestamps for Razorpay queries
+    const now = new Date();
+    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const toTimestamp = Math.floor(now.getTime() / 1000);
+    const todayFromTimestamp = Math.floor(todayStart.getTime() / 1000);
+    const weekFromTimestamp = Math.floor(weekStart.getTime() / 1000);
+    const monthFromTimestamp = Math.floor(monthStart.getTime() / 1000);
+
+    // Fetch payment data from Razorpay in parallel
+    const [todayPayments, weekPayments, monthPayments] = await Promise.all([
+      razorpay.payments.all({ from: todayFromTimestamp, to: toTimestamp, count: 100 }),
+      razorpay.payments.all({ from: weekFromTimestamp, to: toTimestamp, count: 100 }),
+      razorpay.payments.all({ from: monthFromTimestamp, to: toTimestamp, count: 100 })
+    ]);
+
+    // Function to calculate total from payments
+    const calculateTotal = (payments) => {
+      if (!payments || !payments.items) return 0;
+      return payments.items
+        .filter(p => p.status === 'captured')
+        .reduce((sum, p) => sum + p.amount, 0) / 100; // Convert from paise to currency unit
+    };
+
+    const razorpayStats = {
+      today: {
+        total: calculateTotal(todayPayments),
+        count: todayPayments.items.filter(p => p.status === 'captured').length
+      },
+      lastWeek: {
+        total: calculateTotal(weekPayments),
+        count: weekPayments.items.filter(p => p.status === 'captured').length
+      },
+      thisMonth: {
+        total: calculateTotal(monthPayments),
+        count: monthPayments.items.filter(p => p.status === 'captured').length
+      }
+    };
+
+    res.json({ donations, razorpayStats });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch donations' });
+    console.error('Error fetching donations and stats:', error);
+    res.status(500).json({ error: 'Failed to fetch donations and stats', details: error.message });
   }
 };
 
@@ -247,7 +290,7 @@ const sendThankYouEmail = async (donation) => {
 <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; border: 1px solid #f0f0f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
   
   <div style="background-color: white; padding: 25px 30px; text-align: center;">
-    <img src="http://ngo-api.democompany.in.net/images/logo.png" alt="May I Help You Foundation Logo" style="width: 120px; height: auto; margin-bottom: 10px; border-radius: 50%;">
+    <img src="https://firebasestorage.googleapis.com/v0/b/may-i-help-you-foundation.firebasestorage.app/o/logo.png?alt=media&token=9ac09ac5-4c97-418c-b070-2495eac88291" alt="May I Help You Foundation Logo" style="width: 120px; height: auto; margin-bottom: 10px; border-radius: 50%;">
     
     <h1 style="font-family: 'Cooper Black', serif; color: #D81B60; margin: 0; font-size: 26px; text-transform: uppercase; letter-spacing: 1px;">
       May I Help You Foundation
@@ -318,7 +361,7 @@ const sendPaymentStatusEmail = async (donation, status) => {
 <link href="https://fonts.cdnfonts.com/css/cooper-black" rel="stylesheet">
 <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; border: 1px solid #f0f0f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
   <div style="background-color: white; padding: 25px 30px; text-align: center;">
-    <img src="http://ngo-api.democompany.in.net/images/logo.png" alt="May I Help You Foundation Logo" style="width: 120px; height: auto; margin-bottom: 10px; border-radius: 50%;">
+    <img src="https://firebasestorage.googleapis.com/v0/b/may-i-help-you-foundation.firebasestorage.app/o/logo.png?alt=media&token=9ac09ac5-4c97-418c-b070-2495eac88291" alt="May I Help You Foundation Logo" style="width: 120px; height: auto; margin-bottom: 10px; border-radius: 50%;">
     <h1 style="font-family: 'Cooper Black', serif; color: #D81B60; margin: 0; font-size: 26px; text-transform: uppercase; letter-spacing: 1px;">May I Help You Foundation</h1>
   </div>
   <div style="padding: 40px; color: #333; line-height: 1.6;">
