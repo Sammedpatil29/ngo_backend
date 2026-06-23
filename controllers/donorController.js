@@ -13,6 +13,7 @@ exports.createDonor = async (req, res) => {
 
     if (existingDonor) {
       await existingDonor.update({ name, city,email, isBloodDonor, bloodGroup });
+      await sendDonorRegistrationEmail(existingDonor);
       return res.status(200).json(existingDonor);
     }
 
