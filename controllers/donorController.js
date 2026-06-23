@@ -1,3 +1,4 @@
+const { Sequelize } = require('sequelize');
 const Donor = require('../models/donor');
 const nodemailer = require('nodemailer');
 
@@ -67,23 +68,15 @@ exports.updateDonor = async (req, res) => {
     if (!donor) return res.status(404).json({ message: 'Donor not found' });
 
     const { name, email, phone, city, isBloodDonor, bloodGroup } = req.body;
-    const normalizedEmail = email ? email.trim().toLowerCase() : donor.email;
 
-    if (normalizedEmail && normalizedEmail !== donor.email) {
-      const existingEmailDonor = await Donor.findOne({ where: { email: normalizedEmail } });
+    if (email && email !== donor.email) {
+      const existingEmailDonor = await Donor.findOne({ where: { email } });
       if (existingEmailDonor && existingEmailDonor.id !== donor.id) {
         return res.status(409).json({ message: 'Email already in use by another donor' });
       }
     }
 
-    await donor.update({
-      name,
-      email: normalizedEmail,
-      phone,
-      city,
-      isBloodDonor,
-      bloodGroup
-    });
+    await donor.update({ name, email, phone, city, isBloodDonor, bloodGroup });
     res.json(donor);
   } catch (error) {
     console.error('Error updating donor:', error);
