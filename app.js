@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
 const sequelize = require('./database');
 const userRoutes = require('./routes/userRoutes');
@@ -15,6 +16,9 @@ const donorRoutes = require('./routes/donorRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 require('./cron/donationReminder');
 
+// Set a global variable for the project root
+global.appRoot = path.resolve(__dirname);
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const { Storage } = require('@google-cloud/storage');
@@ -29,8 +33,9 @@ const storage = new Storage({
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
-// Serve static files from public directory
-app.use(express.static('public'));
+// Serve static files from 'public' and 'images' directories
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/images', express.static(path.join(__dirname, 'images')));
 
 
 // const allowedOrigin = 'https://ngo-navy.vercel.app';
