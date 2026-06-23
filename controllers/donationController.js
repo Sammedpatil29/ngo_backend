@@ -246,7 +246,7 @@ const sendThankYouEmail = async (donation) => {
 <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; border: 1px solid #f0f0f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
   
   <div style="background-color: white; padding: 25px 30px; text-align: center;">
-    <img src="/images/logo.png" alt="May I Help You Foundation Logo" style="width: 120px; height: auto; margin-bottom: 10px; border-radius: 50%;">
+    <img src="https://ngo-api.democompany.in.net/images/logo.png" alt="May I Help You Foundation Logo" style="width: 120px; height: auto; margin-bottom: 10px; border-radius: 50%;">
     
     <h1 style="font-family: 'Cooper Black', serif; color: #D81B60; margin: 0; font-size: 26px; text-transform: uppercase; letter-spacing: 1px;">
       May I Help You Foundation
@@ -317,7 +317,7 @@ const sendPaymentStatusEmail = async (donation, status) => {
 <link href="https://fonts.cdnfonts.com/css/cooper-black" rel="stylesheet">
 <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; border: 1px solid #f0f0f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
   <div style="background-color: white; padding: 25px 30px; text-align: center;">
-    <img src="/images/logo.png" alt="May I Help You Foundation Logo" style="width: 120px; height: auto; margin-bottom: 10px; border-radius: 50%;">
+    <img src="https://ngo-api.democompany.in.net/images/logo.png" alt="May I Help You Foundation Logo" style="width: 120px; height: auto; margin-bottom: 10px; border-radius: 50%;">
     <h1 style="font-family: 'Cooper Black', serif; color: #D81B60; margin: 0; font-size: 26px; text-transform: uppercase; letter-spacing: 1px;">May I Help You Foundation</h1>
   </div>
   <div style="padding: 40px; color: #333; line-height: 1.6;">
