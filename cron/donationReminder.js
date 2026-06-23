@@ -68,7 +68,7 @@ const sendReminderEmail = async () => {
 <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; border: 1px solid #f0f0f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); background-color: #ffffff;">
   
   <div style="background-color: white; padding: 25px 30px; text-align: center; border-bottom: 2px solid #fce4ec;">
-    <img src="https://ngo-api.democompany.in.net/images/logo.png" alt="May I Help You Foundation Logo" style="width: 100px; height: auto; margin-bottom: 10px; border-radius: 50%;">
+    <img src="uid:logo" alt="May I Help You Foundation Logo" style="width: 100px; height: auto; margin-bottom: 10px; border-radius: 50%;">
     
     <h1 style="font-family: 'Cooper Black', serif; color: #D81B60; margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 1px;">
       May I Help You Foundation
@@ -111,7 +111,12 @@ const sendReminderEmail = async () => {
     <p style="margin: 5px 0;">© 2026 May I Help You Foundation</p>
   </div>
 </div>
-          `
+          `,
+      attachments: [{
+    filename: 'logo.png',
+    path: path.join(__dirname, 'images', 'logo.png'), // Adjust to your local backend path
+    cid: 'logo' // This must match the src="cid:logo" exactly
+  }]
         };
 
         try {
