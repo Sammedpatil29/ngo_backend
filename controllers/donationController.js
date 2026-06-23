@@ -246,7 +246,7 @@ const sendThankYouEmail = async (donation) => {
 <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; border: 1px solid #f0f0f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
   
   <div style="background-color: white; padding: 25px 30px; text-align: center;">
-    <img src="https://ngo-api.democompany.in.net/images/logo.png" alt="May I Help You Foundation Logo" style="width: 120px; height: auto; margin-bottom: 10px; border-radius: 50%;">
+    <img src="uid:logo" alt="May I Help You Foundation Logo" style="width: 120px; height: auto; margin-bottom: 10px; border-radius: 50%;">
     
     <h1 style="font-family: 'Cooper Black', serif; color: #D81B60; margin: 0; font-size: 26px; text-transform: uppercase; letter-spacing: 1px;">
       May I Help You Foundation
@@ -283,7 +283,12 @@ const sendThankYouEmail = async (donation) => {
     <p>This is an automated receipt for your donation. Thank you for making a difference!</p>
   </div>
 </div>
-      `
+      `,
+      attachments: [{
+    filename: 'logo.png',
+    path: path.join(__dirname, 'images', 'logo.png'), // Adjust to your local backend path
+    cid: 'logo' // This must match the src="cid:logo" exactly
+  }]
     };
 
     await transporter.sendMail(mailOptions);
@@ -317,7 +322,7 @@ const sendPaymentStatusEmail = async (donation, status) => {
 <link href="https://fonts.cdnfonts.com/css/cooper-black" rel="stylesheet">
 <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; border: 1px solid #f0f0f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
   <div style="background-color: white; padding: 25px 30px; text-align: center;">
-    <img src="https://ngo-api.democompany.in.net/images/logo.png" alt="May I Help You Foundation Logo" style="width: 120px; height: auto; margin-bottom: 10px; border-radius: 50%;">
+    <img src="uid:logo" alt="May I Help You Foundation Logo" style="width: 120px; height: auto; margin-bottom: 10px; border-radius: 50%;">
     <h1 style="font-family: 'Cooper Black', serif; color: #D81B60; margin: 0; font-size: 26px; text-transform: uppercase; letter-spacing: 1px;">May I Help You Foundation</h1>
   </div>
   <div style="padding: 40px; color: #333; line-height: 1.6;">
@@ -351,7 +356,12 @@ const sendPaymentStatusEmail = async (donation, status) => {
           <p style="font-weight: bold;">Best Regards,</p>
           <p style="color: #D81B60; font-weight: bold;">Team May I Help You Foundation</p>
         </div>
-      `
+      `,
+      attachments: [{
+    filename: 'logo.png',
+    path: path.join(__dirname, 'images', 'logo.png'), // Adjust to your local backend path
+    cid: 'logo' // This must match the src="cid:logo" exactly
+  }]
     };
 
     await transporter.sendMail(mailOptions);
