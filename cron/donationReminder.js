@@ -115,7 +115,7 @@ const sendReminderEmail = async () => {
           `,
       attachments: [{
     filename: 'logo.png',
-    path: path.join(__dirname, '..', 'images', 'logo.png'),
+    path: path.join(global.appRoot, 'images', 'logo.png'),
     cid: 'logo' // This must match the src="cid:logo" exactly
   }]
         };
