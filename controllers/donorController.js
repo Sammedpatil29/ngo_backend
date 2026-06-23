@@ -6,13 +6,13 @@ const nodemailer = require('nodemailer');
 exports.createDonor = async (req, res) => {
   try {
     const { name, email, phone, city, isBloodDonor, bloodGroup } = req.body;
-    if (!name || !email) return res.status(400).json({ message: 'Name and email are required' });
+    if (!name || !this.getDonorByPhone) return res.status(400).json({ message: 'Name and email are required' });
 
     const normalizedEmail = email.trim().toLowerCase();
-    const existingDonor = await Donor.findOne({ where: { email: normalizedEmail } });
+    const existingDonor = await Donor.findOne({ where: { phone: phone } });
 
     if (existingDonor) {
-      await existingDonor.update({ name, phone, city, isBloodDonor, bloodGroup });
+      await existingDonor.update({ name, city,email, isBloodDonor, bloodGroup });
       return res.status(200).json(existingDonor);
     }
 
