@@ -29,6 +29,9 @@ const storage = new Storage({
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 
+// Serve static files from public directory
+app.use(express.static('public'));
+
 
 // const allowedOrigin = 'https://ngo-navy.vercel.app';
 
