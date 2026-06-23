@@ -3,6 +3,7 @@ const nodemailer = require('nodemailer');
 const { Op } = require('sequelize');
 const Donor = require('../models/donor');
 const Donation = require('../models/donation');
+const path = require('path');
 const { updateDonationPaymentStatus } = require('../controllers/donationController');
 
 // Configure email transporter
