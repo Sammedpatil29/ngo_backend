@@ -7,21 +7,30 @@ exports.createDonor = async (req, res) => {
     const { name, email, phone, city, isBloodDonor, bloodGroup } = req.body;
     if (!name || !email) return res.status(400).json({ message: 'Name and email are required' });
 
-    const [donor, created] = await Donor.findOrCreate({
-      where: { email },
-      defaults: { name, phone, city, isBloodDonor, bloodGroup }
-    });
+    const normalizedEmail = email.trim().toLowerCase();
+    const existingDonor = await Donor.findOne({ where: { email: normalizedEmail } });
 
-    if (!created) {
-      // update existing record with provided fields
-      await donor.update({ name, phone, city, isBloodDonor, bloodGroup });
-    } else {
-      await sendDonorRegistrationEmail(donor);
+    if (existingDonor) {
+      await existingDonor.update({ name, phone, city, isBloodDonor, bloodGroup });
+      return res.status(200).json(existingDonor);
     }
 
-    res.status(created ? 201 : 200).json(donor);
+    const donor = await Donor.create({
+      name,
+      email: normalizedEmail,
+      phone,
+      city,
+      isBloodDonor,
+      bloodGroup
+    });
+
+    await sendDonorRegistrationEmail(donor);
+    res.status(201).json(donor);
   } catch (error) {
     console.error('Error creating donor:', error);
+    if (error.name === 'SequelizeUniqueConstraintError' || (error.original && error.original.code === '23505')) {
+      return res.status(409).json({ message: 'Email already exists' });
+    }
     res.status(500).json({ error: 'Failed to create donor', details: error.message });
   }
 };
@@ -58,7 +67,23 @@ exports.updateDonor = async (req, res) => {
     if (!donor) return res.status(404).json({ message: 'Donor not found' });
 
     const { name, email, phone, city, isBloodDonor, bloodGroup } = req.body;
-    await donor.update({ name, email, phone, city, isBloodDonor, bloodGroup });
+    const normalizedEmail = email ? email.trim().toLowerCase() : donor.email;
+
+    if (normalizedEmail && normalizedEmail !== donor.email) {
+      const existingEmailDonor = await Donor.findOne({ where: { email: normalizedEmail } });
+      if (existingEmailDonor && existingEmailDonor.id !== donor.id) {
+        return res.status(409).json({ message: 'Email already in use by another donor' });
+      }
+    }
+
+    await donor.update({
+      name,
+      email: normalizedEmail,
+      phone,
+      city,
+      isBloodDonor,
+      bloodGroup
+    });
     res.json(donor);
   } catch (error) {
     console.error('Error updating donor:', error);
