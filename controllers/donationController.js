@@ -161,6 +161,34 @@ exports.verifyPayment = async (req, res) => {
         donation.paymentStatus = 'completed';
         await donation.save();
         await sendThankYouEmail(donation);
+
+        // Update or create donor when payment is completed
+        if (donation.phone) {
+          try {
+            const normalizedEmail = donation.email ? donation.email.trim().toLowerCase() : null;
+            const existingDonor = await Donor.findOne({ where: { phone: donation.phone } });
+            const donorData = {
+              name: donation.donorName,
+              email: normalizedEmail,
+              city: donation.city,
+              isBloodDonor: donation.isBloodDonor,
+              bloodGroup: donation.bloodGroup
+            };
+
+            if (existingDonor) {
+              await existingDonor.update(donorData);
+              console.log(`Donor updated on payment verification: ${donation.phone}`);
+            } else if (normalizedEmail) {
+              await Donor.create({
+                ...donorData,
+                phone: donation.phone
+              });
+              console.log(`New donor created on payment verification: ${donation.phone}`);
+            }
+          } catch (error) {
+            console.error('Error updating/creating donor on payment verification:', error);
+          }
+        }
       }
       res.json({ status: 'success', message: 'Payment verified successfully' });
     } else {
@@ -218,7 +246,7 @@ const sendThankYouEmail = async (donation) => {
 <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; border: 1px solid #f0f0f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
   
   <div style="background-color: white; padding: 25px 30px; text-align: center;">
-    <img src="https://storage.googleapis.com/may-i-help-you-foundation.firebasestorage.app/1772039322429-upload.png" alt="May I Help You Foundation Logo" style="width: 120px; height: auto; margin-bottom: 10px; border-radius: 50%;">
+    <img src="/images/logo.png" alt="May I Help You Foundation Logo" style="width: 120px; height: auto; margin-bottom: 10px; border-radius: 50%;">
     
     <h1 style="font-family: 'Cooper Black', serif; color: #D81B60; margin: 0; font-size: 26px; text-transform: uppercase; letter-spacing: 1px;">
       May I Help You Foundation
@@ -289,7 +317,7 @@ const sendPaymentStatusEmail = async (donation, status) => {
 <link href="https://fonts.cdnfonts.com/css/cooper-black" rel="stylesheet">
 <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; border: 1px solid #f0f0f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
   <div style="background-color: white; padding: 25px 30px; text-align: center;">
-    <img src="https://storage.googleapis.com/may-i-help-you-foundation.firebasestorage.app/1772039322429-upload.png" alt="May I Help You Foundation Logo" style="width: 120px; height: auto; margin-bottom: 10px; border-radius: 50%;">
+    <img src="/images/logo.png" alt="May I Help You Foundation Logo" style="width: 120px; height: auto; margin-bottom: 10px; border-radius: 50%;">
     <h1 style="font-family: 'Cooper Black', serif; color: #D81B60; margin: 0; font-size: 26px; text-transform: uppercase; letter-spacing: 1px;">May I Help You Foundation</h1>
   </div>
   <div style="padding: 40px; color: #333; line-height: 1.6;">
