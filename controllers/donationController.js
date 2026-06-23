@@ -269,8 +269,12 @@ const sendPaymentStatusEmail = async (donation, status) => {
   if (!donation || !donation.email) return;
 
   const subject = status === 'completed'
-    ? `Thank You for Your Donation ${donation.transactionId}`
+    ? `Donation Payment Completed - ${donation.transactionId}`
     : `Donation Payment Failed - ${donation.transactionId}`;
+
+  const statusMessage = status === 'completed'
+    ? 'Your payment has been completed successfully.'
+    : 'Your payment could not be completed. Please try again or contact support.';
 
   try {
     const transporter = nodemailer.createTransport({
@@ -285,44 +289,17 @@ const sendPaymentStatusEmail = async (donation, status) => {
       from: process.env.EMAIL_USER || 'sammed.patil29@gmail.com',
       to: donation.email,
       subject,
-      html: status === 'completed' ? `
-<link href="https://fonts.googleapis.com/css2?family=Anek+Telugu:wght@400;700&family=Luckiest+Guy&display=swap" rel="stylesheet">
-<link href="https://fonts.cdnfonts.com/css/cooper-black" rel="stylesheet">
-<div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; border: 1px solid #f0f0f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
-  <div style="background-color: white; padding: 25px 30px; text-align: center;">
-    <img src="https://storage.googleapis.com/may-i-help-you-foundation.firebasestorage.app/1772039322429-upload.png" alt="May I Help You Foundation Logo" style="width: 120px; height: auto; margin-bottom: 10px; border-radius: 50%;">
-    <h1 style="font-family: 'Cooper Black', serif; color: #D81B60; margin: 0; font-size: 26px; text-transform: uppercase; letter-spacing: 1px;">May I Help You Foundation</h1>
-  </div>
-  <div style="padding: 40px; color: #333; line-height: 1.6;">
-    <h2 style="color: #D81B60; margin-top: 0;"><span style="font-family: luckiest guy, anek telugu, sans-serif">ధన్యవాదాలు </span>(Thank You), ${donation.donorName || 'Supporter'}!</h2>
-    <p style="font-size: 16px; font-family: luckiest guy, anek telugu, sans-serif">మీ ఉదారతకు మేము కృతజ్ఞతలు తెలుపుకుంటున్నాము.</p>
-    <p style="font-size: 16px;">We have successfully received your generous contribution of:</p>
-    <div style="background-color: #fce4ec; border-radius: 8px; padding: 20px; text-align: center; margin: 25px 0;">
-      <span style="font-size: 32px; font-weight: bold; color: #D81B60;">${donation.currency} ${donation.amount}</span>
-    </div>
-    <div style="font-size: 14px; color: #666; border-top: 1px solid #eee; padding-top: 20px;">
-      <p><strong>Transaction ID:</strong> ${donation.transactionId}</p>
-    </div>
-    <p style="margin-top: 30px; font-size: 16px;">Your support helps us empower the underprivileged through sustainable initiatives in education and healthcare.</p>
-    <br>
-    <p style="margin: 0; font-weight: bold;">Best Regards,</p>
-    <p style="margin: 5px 0; color: #D81B60; font-weight: bold;">Team May I Help You Foundation</p>
-  </div>
-  <div style="background-color: #f9f9f9; padding: 20px; text-align: center; font-size: 12px; color: #999;">
-    <p>This is an automated receipt for your donation. Thank you for making a difference!</p>
-  </div>
-</div>
-      ` : `
+      html: `
         <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; padding: 25px; border: 1px solid #eee; border-radius: 12px; background: #fff;">
           <h2 style="color: #D81B60;">${subject}</h2>
           <p>Hello ${donation.donorName || 'Supporter'},</p>
-          <p style="font-size: 16px; color: #333;">We were unable to complete your payment for the donation at this time.</p>
-          <p style="font-size: 16px; color: #333;"><strong>Transaction ID:</strong> ${donation.transactionId}</p>
-          <p style="font-size: 16px; color: #333;"><strong>Amount:</strong> ${donation.currency} ${donation.amount}</p>
-          <p style="font-size: 16px; color: #333;">Please try again or contact support if you need assistance.</p>
+          <p>${statusMessage}</p>
+          <p><strong>Transaction ID:</strong> ${donation.transactionId}</p>
+          <p><strong>Amount:</strong> ${donation.currency} ${donation.amount}</p>
+          <p>If you have any questions, please reply to this email.</p>
           <br />
-          <p style="font-weight: bold;">Best Regards,</p>
-          <p style="color: #D81B60; font-weight: bold;">Team May I Help You Foundation</p>
+          <p>Best Regards,</p>
+          <p>Team May I Help You Foundation</p>
         </div>
       `
     };
