@@ -237,7 +237,7 @@ const sendThankYouEmail = async (donation) => {
     });
 
     const mailOptions = {
-      from: process.env.EMAIL_USER || 'sammed.patil29@gmail.com',
+      from: `"May I Help You Foundation" <${process.env.EMAIL_USER}>`,
       to: donation.email,
       subject: `Thank You for Your Donation ${donation.transactionId}`,
       html: `
@@ -309,7 +309,7 @@ const sendPaymentStatusEmail = async (donation, status) => {
     });
 
     const mailOptions = {
-      from: process.env.EMAIL_USER || 'sammed.patil29@gmail.com',
+      from: `"May I Help You Foundation" <${process.env.EMAIL_USER}>`,
       to: donation.email,
       subject,
       html: status === 'completed' ? `

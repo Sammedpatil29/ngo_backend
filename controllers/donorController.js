@@ -123,7 +123,7 @@ const sendDonorRegistrationEmail = async (donor) => {
   });
 
   const mailOptions = {
-    from: process.env.EMAIL_USER || 'sammed.patil29@gmail.com',
+    from: `"May I Help You Foundation" <${process.env.EMAIL_USER}>`,
     to: donor.email,
     subject: `Thank you for registering with May I Help You Foundation`,
     html: `

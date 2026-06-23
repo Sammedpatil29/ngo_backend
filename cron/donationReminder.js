@@ -56,7 +56,7 @@ const sendReminderEmail = async () => {
         }
 
         const mailOptions = {
-          from: process.env.EMAIL_USER || 'sammed.patil29@gmail.com',
+          from: `"May I Help You Foundation" <${process.env.EMAIL_USER}>`,
           to: donor.email,
           subject: 'Your Support Matters - May I Help You Foundation',
           html: `
