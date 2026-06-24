@@ -87,17 +87,20 @@ exports.getAllDonations = async (req, res) => {
     const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const yearStart = new Date(now.getFullYear(), 0, 1);
 
     const toTimestamp = Math.floor(now.getTime() / 1000);
     const todayFromTimestamp = Math.floor(todayStart.getTime() / 1000);
     const weekFromTimestamp = Math.floor(weekStart.getTime() / 1000);
     const monthFromTimestamp = Math.floor(monthStart.getTime() / 1000);
+    const yearFromTimestamp = Math.floor(yearStart.getTime() / 1000);
 
     // Fetch payment data from Razorpay in parallel
-    const [todayPayments, weekPayments, monthPayments] = await Promise.all([
+    const [todayPayments, weekPayments, monthPayments, yearPayments] = await Promise.all([
       razorpay.payments.all({ from: todayFromTimestamp, to: toTimestamp, count: 100 }),
       razorpay.payments.all({ from: weekFromTimestamp, to: toTimestamp, count: 100 }),
-      razorpay.payments.all({ from: monthFromTimestamp, to: toTimestamp, count: 100 })
+      razorpay.payments.all({ from: monthFromTimestamp, to: toTimestamp, count: 100 }),
+      razorpay.payments.all({ from: yearFromTimestamp, to: toTimestamp, count: 100 })
     ]);
 
     // Function to calculate total from payments
@@ -120,6 +123,10 @@ exports.getAllDonations = async (req, res) => {
       thisMonth: {
         total: calculateTotal(monthPayments),
         count: monthPayments.items.filter(p => p.status === 'captured').length
+      },
+      thisYear: {
+        total: calculateTotal(yearPayments),
+        count: yearPayments.items.filter(p => p.status === 'captured').length
       }
     };
 
