@@ -67,7 +67,7 @@ const sendLoginAlertEmail = async (loginDetails) => {
             <li><strong>User Email:</strong> ${email}</li>
             <li><strong>IP Address:</strong> ${ipAddress || 'Not provided'}</li>
             <li><strong>Location:</strong> ${latitude && longitude ? `${latitude}, ${longitude}` : 'Not provided'}</li>
-            <li><strong>Time:</strong> ${new Date().toLocaleString()}</li>
+            <li><strong>Time:</strong> ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</li>
           </ul>
         </div>
       `
