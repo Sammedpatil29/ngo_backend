@@ -425,7 +425,12 @@ const updateDonationPaymentStatus = async (orderId) => {
       const payments = await razorpay.orders.fetchPayments(orderId);
       const items = payments.items || [];
 
-      if (items.some(p => ['captured', 'paid', 'authorized'].includes(p.status))) {
+      if (items.length === 0) {
+        const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+        if (donation.createdAt < fifteenMinutesAgo) {
+          newStatus = 'no_action';
+        }
+      } else if (items.some(p => ['captured', 'paid', 'authorized'].includes(p.status))) {
         newStatus = 'completed';
       } else if (items.some(p => ['failed', 'cancelled'].includes(p.status))) {
         newStatus = 'failed';
@@ -435,7 +440,6 @@ const updateDonationPaymentStatus = async (orderId) => {
     if (newStatus !== donation.paymentStatus) {
       donation.paymentStatus = newStatus;
       await donation.save();
-      await sendPaymentStatusEmail(donation, newStatus);
 
       // Update or create donor when payment is completed
       if (newStatus === 'completed' && donation.phone) {
