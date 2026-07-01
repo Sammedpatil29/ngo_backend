@@ -428,7 +428,7 @@ const updateDonationPaymentStatus = async (orderId) => {
       if (items.length === 0) {
         const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
         if (donation.createdAt < fifteenMinutesAgo) {
-          newStatus = 'no_action';
+          newStatus = 'Cancelled';
         }
       } else if (items.some(p => ['captured', 'paid', 'authorized'].includes(p.status))) {
         newStatus = 'completed';
