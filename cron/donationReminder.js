@@ -162,7 +162,7 @@ const checkRecentPendingDonationsStatus = async () => {
 };
 
 // Schedule the cron job to run every day at midnight
-cron.schedule('0 0 * * *', checkRecentPendingDonationsStatus);
+cron.schedule('*/30 * * * *', checkRecentPendingDonationsStatus);
 
 // Schedule the cron job to run every day at 10:00 AM
 cron.schedule('0 10 * * *', sendReminderEmail);

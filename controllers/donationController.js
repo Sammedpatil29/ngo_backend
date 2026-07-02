@@ -423,9 +423,10 @@ const updateDonationPaymentStatus = async (orderId) => {
       newStatus = 'completed';
     } else {
       const payments = await razorpay.orders.fetchPayments(orderId);
-      const items = payments.items || [];
+      console.log(`Fetched payments for order ${orderId}:`, payments);
+      // const items = payments.items || [];
 
-      if (items.length === 0) {
+      if (payments.attempts === 0) {
         const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
         if (donation.createdAt < fifteenMinutesAgo) {
           newStatus = 'Cancelled';
