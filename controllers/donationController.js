@@ -421,21 +421,24 @@ const updateDonationPaymentStatus = async (orderId) => {
 
     if (order.status === 'paid') {
       newStatus = 'completed';
+    } else if (order.status === 'created' && order.attempts === 0) {
+      const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+      if (new Date(donation.createdAt) < fifteenMinutesAgo) {
+        newStatus = 'Cancelled';
+      }
     } else {
       const payments = await razorpay.orders.fetchPayments(orderId);
-      console.log(`Fetched payments for order ${orderId}:`, payments);
-      // const items = payments.items || [];
-
-      if (payments.attempts === 0) {
-        const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-        if (donation.createdAt < fifteenMinutesAgo) {
-          newStatus = 'Cancelled';
-        }
-      } else if (items.some(p => ['captured', 'paid', 'authorized'].includes(p.status))) {
+      const items = payments.items || [];
+      if(payments.count > 0) {
+        
+      // Check payment items if the order status isn't definitively 'paid'
+      if (items.some(p => ['captured', 'authorized'].includes(p.status))) {
         newStatus = 'completed';
       } else if (items.some(p => ['failed', 'cancelled'].includes(p.status))) {
         newStatus = 'failed';
       }
+      }
+
     }
 
     if (newStatus !== donation.paymentStatus) {
