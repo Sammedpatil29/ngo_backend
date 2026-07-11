@@ -96,11 +96,13 @@ exports.getAllDonations = async (req, res) => {
     const yearFromTimestamp = Math.floor(yearStart.getTime() / 1000);
 
     // Fetch payment data from Razorpay in parallel
-    const [todayPayments, weekPayments, monthPayments, yearPayments] = await Promise.all([
+    const [todayPayments, weekPayments, monthPayments, yearPayments, allSubscriptions, allPlans] = await Promise.all([
       razorpay.payments.all({ from: todayFromTimestamp, to: toTimestamp, count: 100 }),
       razorpay.payments.all({ from: weekFromTimestamp, to: toTimestamp, count: 100 }),
       razorpay.payments.all({ from: monthFromTimestamp, to: toTimestamp, count: 100 }),
-      razorpay.payments.all({ from: yearFromTimestamp, to: toTimestamp, count: 100 })
+      razorpay.payments.all({ from: yearFromTimestamp, to: toTimestamp, count: 100 }),
+      razorpay.subscriptions.all({ count: 100 }), // Fetch up to 100 subscriptions
+      razorpay.plans.all({ count: 100 }) // Fetch up to 100 plans
     ]);
 
     // Function to calculate total from payments
@@ -111,22 +113,42 @@ exports.getAllDonations = async (req, res) => {
         .reduce((sum, p) => sum + p.amount, 0) / 100; // Convert from paise to currency unit
     };
 
+    // Create a lookup map for plan amounts from the fetched plans
+    const planAmountMap = new Map();
+    if (allPlans && allPlans.items) {
+      allPlans.items.forEach(plan => {
+        planAmountMap.set(plan.id, plan.item.amount);
+      });
+    }
+
+    // Calculate active subscriptions and their total monthly value
+    const activeSubscriptions = allSubscriptions && allSubscriptions.items
+      ? allSubscriptions.items.filter(sub => sub.status === 'active')
+      : [];
+    const activeSubscriptionsCount = activeSubscriptions.length;
+    const activeSubscriptionsTotal = activeSubscriptions
+      .reduce((sum, sub) => sum + (planAmountMap.get(sub.plan_id) || 0), 0) / 100; // Get amount from map
+
     const razorpayStats = {
       today: {
         total: calculateTotal(todayPayments),
-        count: todayPayments.items.filter(p => p.status === 'captured').length
+        count: (todayPayments.items || []).filter(p => p.status === 'captured').length
       },
       lastWeek: {
         total: calculateTotal(weekPayments),
-        count: weekPayments.items.filter(p => p.status === 'captured').length
+        count: (weekPayments.items || []).filter(p => p.status === 'captured').length
       },
       thisMonth: {
         total: calculateTotal(monthPayments),
-        count: monthPayments.items.filter(p => p.status === 'captured').length
+        count: (monthPayments.items || []).filter(p => p.status === 'captured').length
       },
       thisYear: {
         total: calculateTotal(yearPayments),
-        count: yearPayments.items.filter(p => p.status === 'captured').length
+        count: (yearPayments.items || []).filter(p => p.status === 'captured').length
+      },
+      activeSubscriptions: {
+        total: activeSubscriptionsTotal,
+        count: activeSubscriptionsCount
       }
     };
 
@@ -480,7 +502,155 @@ const updateDonationPaymentStatus = async (orderId) => {
   return donation;
 };
 
-exports.updateDonationPaymentStatus = updateDonationPaymentStatus;
+exports.createCustomSubscription = async (req, res) => {
+  try {
+    // 1. Get the custom amount entered by the donor from the Angular request
+    console.log(req.body)
+    const { donorName, email, phone, city, amount, currency, message, transactionId, paymentStatus, isBloodDonor, bloodGroup } = req.body; // e.g., 350
+    // console.log(process.env.RAZORPAY_KEY_ID, process.env.RAZORPAY_KEY_SECRET);
+    // Razorpay accepts amounts in PAISE (Multiply INR by 100)
+    const amountInPaise = amount * 100; 
+
+    // 2. Step One: Create a brand new, dynamic plan for this exact amount
+    const planOptions = {
+      period: 'monthly',
+      interval: 1,
+      item: {
+        name: `Custom Monthly Donation Plan - ₹${amount}`,
+        amount: amountInPaise,
+        currency: 'INR',
+        description: 'Dynamically generated recurring donation tier'
+      }
+    };
+    // console.log('Creating dynamic plan with options:', planOptions);
+    const dynamicPlan = await razorpay.plans.create(planOptions);
+    // console.log('Dynamic plan created:', dynamicPlan);
+    // 3. Step Two: Instantly use the newly generated plan.id to create the subscription
+    const subscriptionOptions = {
+      plan_id: dynamicPlan.id, // The dynamic plan ID from step 2
+      total_count: 12,        // 12 months
+      quantity: 1,
+      customer_notify: 1
+    };
+    // console.log('Creating subscription with options:', subscriptionOptions);
+    const subscription = await razorpay.subscriptions.create(subscriptionOptions);
+    // console.log('Subscription created:', subscription);
+    const newDonation = await Donation.create({
+      donorName,
+      email,
+      phone,
+      city,
+      amount,
+      currency,
+      message,
+      transactionId: subscription.id, // Save Razorpay Order ID
+      paymentStatus: 'pending',
+      isBloodDonor,
+      bloodGroup
+    });
+
+    // 4. Send the subscription ID back to Angular to trigger the rzp.open() checkout modal
+    res.status(200).json({
+      success: true,
+      donation: newDonation,
+      subscription_id: subscription.id
+    });
+
+  } catch (error) {
+    console.error('Error creating custom subscription:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+};
+
+exports.verifyCustomDonation = async (req, res) => {
+  const { razorpay_payment_id, razorpay_subscription_id, razorpay_signature } = req.body;
+
+  if (!razorpay_payment_id || !razorpay_subscription_id || !razorpay_signature) {
+    return res.status(400).json({ valid: false, message: 'Missing required payment details.' });
+  }
+
+  try {
+    // 1. Verify the signature from Razorpay
+    const secret = process.env.RAZORPAY_KEY_SECRET || 'q2lFxfOyVyAkD1GQMbitqNre';
+    const generated_signature = crypto
+      .createHmac('sha256', secret)
+      .update(razorpay_payment_id + '|' + razorpay_subscription_id)
+      .digest('hex');
+
+    if (generated_signature !== razorpay_signature) {
+      return res.status(400).json({ valid: false, message: 'Signature verification failed. Request is not from a trusted source.' });
+    }
+
+    // 2. Signature is valid, now find the corresponding donation record
+    const donation = await Donation.findOne({ where: { transactionId: razorpay_subscription_id } });
+    if (!donation) {
+      return res.status(404).json({ valid: false, message: 'Donation record not found for this subscription.' });
+    }
+
+    // 3. Start polling for the subscription status and wait for it to complete.
+    const finalStatus = await pollSubscriptionStatus(razorpay_subscription_id, donation);
+
+    // 4. Respond to the client with the final status from the polling.
+    if (finalStatus.status === 'completed') {
+      res.status(200).json({ valid: true, status: 'completed', message: finalStatus.message });
+    } else {
+      res.status(400).json({ valid: false, status: finalStatus.status, message: finalStatus.message });
+    }
+
+  } catch (error) {
+    console.error('Error in verifyCustomDonation:', error);
+    res.status(500).json({ valid: false, message: 'An internal server error occurred during verification.' });
+  }
+};
+
+const pollSubscriptionStatus = (subscriptionId, donation, maxDurationMs = 10 * 60 * 1000, intervalMs = 3000) => {
+  return new Promise((resolve) => {
+    const startTime = Date.now();
+    console.log(`[${subscriptionId}] Starting to poll for subscription status.`);
+
+    const poll = async () => {
+      if (Date.now() - startTime > maxDurationMs) {
+        console.log(`[${subscriptionId}] Polling timed out after 10 minutes. Stopping.`);
+        resolve({ status: 'timed_out', message: 'Subscription status check timed out after 10 minutes.' });
+        return;
+      }
+
+      try {
+        const subscription = await razorpay.subscriptions.fetch(subscriptionId);
+        console.log(`[${subscriptionId}] Polled status: ${subscription.status}`);
+
+        if (['active', 'completed'].includes(subscription.status)) {
+          if (donation.paymentStatus !== 'completed') {
+            donation.paymentStatus = 'completed';
+            await donation.save();
+            await sendThankYouEmail(donation);
+            console.log(`[${subscriptionId}] Status is '${subscription.status}'. Updated DB to 'completed' and sent email.`);
+          }
+          // Resolve the promise to stop polling and send response to client
+          resolve({ status: 'completed', message: 'Subscription activated successfully.' });
+          return;
+        } else if (['halted', 'cancelled', 'expired'].includes(subscription.status)) {
+          if (donation.paymentStatus !== 'failed') {
+            donation.paymentStatus = 'failed';
+            await donation.save();
+            await sendPaymentStatusEmail(donation, 'failed');
+            console.log(`[${subscriptionId}] Status is '${subscription.status}'. Updated DB to 'failed' and sent email.`);
+          }
+          // Resolve the promise on failure states to stop polling
+          resolve({ status: 'failed', message: `Subscription is in a failed state: ${subscription.status}.` });
+          return;
+        }
+      } catch (error) {
+        console.error(`[${subscriptionId}] Error during polling:`, error);
+      }
+
+      // If not a final state, poll again after the interval
+      setTimeout(poll, intervalMs);
+    };
+
+    poll();
+  });
+};
 
 const schedulePaymentStatusCheck = (orderId, delayMs = 3 * 60 * 1000) => {
   setTimeout(async () => {
@@ -491,3 +661,63 @@ const schedulePaymentStatusCheck = (orderId, delayMs = 3 * 60 * 1000) => {
     }
   }, delayMs);
 };
+
+exports.webhookUpdate = async (req, res) => {
+  const secret = process.env.RAZORPAY_WEBHOOK_SECRET || 'YOUR_WEBHOOK_SECRET';
+  const receivedSignature = req.headers['x-razorpay-signature'];
+
+  // It's crucial to validate the webhook signature to ensure it's from Razorpay
+  try {
+    const generatedSignature = crypto
+      .createHmac('sha256', secret)
+      .update(JSON.stringify(req.body))
+      .digest('hex');
+
+    if (generatedSignature !== receivedSignature) {
+      console.warn('Webhook signature validation failed.');
+      // For security, don't process unverified webhooks
+      return res.status(400).send('Invalid signature');
+    }
+  } catch (error) {
+    console.error('Error validating webhook signature:', error);
+    return res.status(500).send('Error validating signature');
+  }
+
+  const eventData = req.body;
+
+  if (eventData.event === 'subscription.charged') {
+    try {
+      const subscriptionDetails = eventData.payload.subscription.entity;
+      const paymentDetails = eventData.payload.payment.entity;
+
+      // Find the original donation to get donor details
+      const originalDonation = await Donation.findOne({
+        where: { transactionId: subscriptionDetails.id },
+        order: [['createdAt', 'ASC']]
+      });
+
+      if (originalDonation) {
+        // Create a new donation record for this recurring payment
+        const recurringDonation = await Donation.create({
+          donorName: originalDonation.donorName,
+          email: originalDonation.email,
+          phone: originalDonation.phone,
+          city: originalDonation.city,
+          amount: paymentDetails.amount / 100, // Convert from paise
+          currency: paymentDetails.currency,
+          message: `Recurring donation from subscription ${subscriptionDetails.id}`,
+          transactionId: paymentDetails.id, // Use the new payment ID
+          paymentStatus: 'completed',
+        });
+        console.log(`Recurring donation recorded: ${recurringDonation.id} for payment ${paymentDetails.id}`);
+        await sendThankYouEmail(recurringDonation);
+      }
+    } catch (error) {
+      console.error('Error processing subscription.charged webhook:', error);
+    }
+  }
+
+  res.status(200).send('Webhook Acknowledged');
+};
+
+exports.updateDonationPaymentStatus = updateDonationPaymentStatus;
