@@ -4,7 +4,11 @@ const admin = require('firebase-admin');
 
 let serviceAccount;
 try {
-  serviceAccount = require('../may-i-help-you-foundation-firebase-adminsdk-fbsvc-70cfe5cb12.json');
+  if (process.env.GCP_SERVICE_ACCOUNT_JSON) {
+    serviceAccount = JSON.parse(process.env.GCP_SERVICE_ACCOUNT_JSON);
+  } else {
+    serviceAccount = require('../may-i-help-you-foundation-firebase-adminsdk-fbsvc-70cfe5cb12.json');
+  }
 } catch (e) {
   // Service account not found, falling back to default credentials
 }

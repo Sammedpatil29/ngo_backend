@@ -48,7 +48,7 @@ const Donation = sequelize.define('donation', {
     allowNull: true
   },
   paymentStatus: {
-    type: Sequelize.ENUM('pending', 'completed', 'failed'),
+    type: Sequelize.ENUM('pending', 'completed', 'failed', 'Cancelled'),
     defaultValue: 'pending'
   },
   transactionId: {

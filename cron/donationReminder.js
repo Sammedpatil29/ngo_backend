@@ -1,7 +1,10 @@
 const cron = require('node-cron');
 const nodemailer = require('nodemailer');
+const { Op } = require('sequelize');
 const Donor = require('../models/donor');
 const Donation = require('../models/donation');
+const path = require('path');
+const { updateDonationPaymentStatus } = require('../controllers/donationController');
 
 // Configure email transporter
 const transporter = nodemailer.createTransport({
@@ -54,7 +57,7 @@ const sendReminderEmail = async () => {
         }
 
         const mailOptions = {
-          from: process.env.EMAIL_USER || 'sammed.patil29@gmail.com',
+          from: `"May I Help You Foundation" <${process.env.EMAIL_USER}>`,
           to: donor.email,
           subject: 'Your Support Matters - May I Help You Foundation',
           html: `
@@ -66,7 +69,7 @@ const sendReminderEmail = async () => {
 <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: auto; border: 1px solid #f0f0f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); background-color: #ffffff;">
   
   <div style="background-color: white; padding: 25px 30px; text-align: center; border-bottom: 2px solid #fce4ec;">
-    <img src="https://storage.googleapis.com/may-i-help-you-foundation.firebasestorage.app/1772039322429-upload.png" alt="May I Help You Foundation Logo" style="width: 100px; height: auto; margin-bottom: 10px; border-radius: 50%;">
+    <img src="https://firebasestorage.googleapis.com/v0/b/may-i-help-you-foundation.firebasestorage.app/o/logo.png?alt=media&token=9ac09ac5-4c97-418c-b070-2495eac88291" alt="May I Help You Foundation Logo" style="width: 100px; height: auto; margin-bottom: 10px; border-radius: 50%;">
     
     <h1 style="font-family: 'Cooper Black', serif; color: #D81B60; margin: 0; font-size: 24px; text-transform: uppercase; letter-spacing: 1px;">
       May I Help You Foundation
@@ -124,6 +127,42 @@ const sendReminderEmail = async () => {
     console.error('Error in donation reminder job:', error);
   }
 };
+
+const checkRecentPendingDonationsStatus = async () => {
+  console.log('Starting nightly payment status check for recent donations...');
+  try {
+    const sinceDate = new Date();
+    sinceDate.setDate(sinceDate.getDate() - 2);
+
+    const pendingDonations = await Donation.findAll({
+      where: {
+        paymentStatus: 'pending',
+        createdAt: {
+          [Op.gte]: sinceDate
+        }
+      }
+    });
+
+    if (!pendingDonations || pendingDonations.length === 0) {
+      console.log('No pending donations from the last 2 days found.');
+      return;
+    }
+
+    for (const donation of pendingDonations) {
+      try {
+        console.log(`Checking status for order ${donation.transactionId}`);
+        await updateDonationPaymentStatus(donation.transactionId);
+      } catch (error) {
+        console.error(`Failed to update status for order ${donation.transactionId}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error('Error checking recent pending donations:', error);
+  }
+};
+
+// Schedule the cron job to run every day at midnight
+cron.schedule('*/40 * * * *', checkRecentPendingDonationsStatus);
 
 // Schedule the cron job to run every day at 10:00 AM
 cron.schedule('0 10 * * *', sendReminderEmail);

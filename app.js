@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const path = require('path');
 const cors = require('cors');
 const sequelize = require('./database');
 const userRoutes = require('./routes/userRoutes');
@@ -11,11 +12,19 @@ const newsRoutes = require('./routes/newsRoutes');
 const mediaRoutes = require('./routes/mediaRoutes');
 const homeRoutes = require('./routes/homeRoutes');
 const donationRoutes = require('./routes/donationRoutes');
+const donorRoutes = require('./routes/donorRoutes');
 const reviewRoutes = require('./routes/reviewRoutes');
 require('./cron/donationReminder');
 
+// Set a global variable for the project root
+global.appRoot = path.resolve(__dirname);
+
 const app = express();
 const PORT = process.env.PORT || 3000;
+const { Storage } = require('@google-cloud/storage');
+const storage = new Storage({
+  credentials: JSON.parse(process.env.GCP_SERVICE_ACCOUNT_JSON)
+});
 
 // Middleware
 // app.use(cors({
@@ -23,6 +32,11 @@ const PORT = process.env.PORT || 3000;
 // }));
 app.use(cors());
 app.use(express.json({ limit: '50mb' }));
+
+// Serve static files from 'public' and 'images' directories
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/images', express.static(path.join(__dirname, 'images')));
+
 
 // const allowedOrigin = 'https://ngo-navy.vercel.app';
 
@@ -59,6 +73,7 @@ app.use('/api/news', newsRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/home', homeRoutes);
 app.use('/api/donations', donationRoutes);
+app.use('/api/donors', donorRoutes);
 app.use('/api/reviews', reviewRoutes);
 
 sequelize
