@@ -686,9 +686,17 @@ exports.webhookUpdate = async (req, res) => {
   // }
 
   const eventData = req.body;
+  console.log(eventData)
 
   if (eventData.event === 'subscription.charged') {
     try {
+      // Defensive check to ensure the payload structure is as expected.
+      if (!eventData.payload || !eventData.payload.subscription || !eventData.payload.subscription.entity || !eventData.payload.payment || !eventData.payload.payment.entity) {
+        console.error('[Webhook] Received subscription.charged event with unexpected payload structure.');
+        // Acknowledge the webhook but log an error.
+        return res.status(400).send('Webhook Error: Malformed payload.');
+      }
+
       const subscriptionDetails = eventData.payload.subscription.entity;
       const paymentDetails = eventData.payload.payment.entity;
 
@@ -723,11 +731,13 @@ exports.webhookUpdate = async (req, res) => {
           amount: paymentDetails.amount / 100, // Convert from paise
           currency: paymentDetails.currency,
           message: `Recurring donation from subscription ${subscriptionDetails.id}`,
-          transactionId: paymentDetails.id, // Use the new payment ID
+          transactionId: subscriptionDetails.id, // Use the new payment ID
           paymentStatus: 'completed',
         });
         console.log(`Recurring donation recorded: ${recurringDonation.id} for payment ${paymentDetails.id}`);
         await sendThankYouEmail(recurringDonation);
+      } else {
+        console.warn(`[Webhook] Could not find original donation for subscription ID: ${subscriptionDetails.id}. No recurring donation created.`);
       }
     } catch (error) {
       console.error('Error processing subscription.charged webhook:', error);
