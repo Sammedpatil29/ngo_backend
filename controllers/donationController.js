@@ -4,6 +4,7 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const path = require('path');
+const axios = require('axios');
 
 const razorpay = new Razorpay({
   key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_S5RLYqr6y2I6xs',
@@ -96,13 +97,19 @@ exports.getAllDonations = async (req, res) => {
     const yearFromTimestamp = Math.floor(yearStart.getTime() / 1000);
 
     // Fetch payment data from Razorpay in parallel
-    const [todayPayments, weekPayments, monthPayments, yearPayments, allSubscriptions, allPlans] = await Promise.all([
+    const [todayPayments, weekPayments, monthPayments, yearPayments, allSubscriptions, allPlans, balanceResponse] = await Promise.all([
       razorpay.payments.all({ from: todayFromTimestamp, to: toTimestamp, count: 100 }),
       razorpay.payments.all({ from: weekFromTimestamp, to: toTimestamp, count: 100 }),
       razorpay.payments.all({ from: monthFromTimestamp, to: toTimestamp, count: 100 }),
       razorpay.payments.all({ from: yearFromTimestamp, to: toTimestamp, count: 100 }),
-      razorpay.subscriptions.all({ count: 100 }), // Fetch up to 100 subscriptions
-      razorpay.plans.all({ count: 100 }) // Fetch up to 100 plans
+      razorpay.subscriptions.all(), // Fetch up to 100 subscriptions
+      razorpay.plans.all(), // Fetch up to 100 plans
+      axios.get('https://api.razorpay.com/v1/balance', {
+        auth: {
+          username: process.env.RAZORPAY_KEY_ID || 'rzp_test_S5RLYqr6y2I6xs',
+          password: process.env.RAZORPAY_KEY_SECRET || 'q2lFxfOyVyAkD1GQMbitqNre'
+        }
+      })
     ]);
 
     // Function to calculate total from payments
@@ -149,7 +156,8 @@ exports.getAllDonations = async (req, res) => {
       activeSubscriptions: {
         total: activeSubscriptionsTotal,
         count: activeSubscriptionsCount
-      }
+      },
+      balance: (balanceResponse.data.balance || 0) / 100 // Add balance to stats
     };
 
     res.json({ donations, razorpayStats });
