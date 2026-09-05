@@ -76,9 +76,24 @@ app.use('/api/donations', donationRoutes);
 app.use('/api/donors', donorRoutes);
 app.use('/api/reviews', reviewRoutes);
 
+const ensureSchema = async () => {
+  try {
+    await sequelize.query(`ALTER TABLE IF EXISTS "donations" ADD COLUMN IF NOT EXISTS "subscriptionId" VARCHAR(255);`);
+    await sequelize.query(`ALTER TABLE IF EXISTS "donations" ADD COLUMN IF NOT EXISTS "mode" VARCHAR(255) DEFAULT '1-time';`);
+    console.log('Donation table schema verified/updated successfully.');
+  } catch (schemaErr) {
+    console.warn('Schema check warning:', schemaErr.message);
+  }
+};
+
 sequelize
-  .sync({ alter: true })
+  .authenticate()
+  .then(async () => {
+    console.log('Database connected successfully.');
+    await ensureSchema();
+    return sequelize.sync({ alter: false });
+  })
   .then(() => {
     app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
   })
-  .catch(err => console.log(err));
+  .catch(err => console.log('Database startup error:', err));

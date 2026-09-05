@@ -82,6 +82,7 @@ exports.createDonation = async (req, res) => {
       currency: selectedCurrency,
       message,
       transactionId: order.id,
+      mode: '1-time',
       paymentStatus: 'pending',
       isBloodDonor: !!isBloodDonor,
       bloodGroup: bloodGroup || null
@@ -355,6 +356,8 @@ exports.createCustomSubscription = async (req, res) => {
       currency: currency || 'INR',
       message,
       transactionId: subscription.id,
+      subscriptionId: subscription.id,
+      mode: 'auto',
       paymentStatus: 'pending',
       isBloodDonor: !!isBloodDonor,
       bloodGroup: bloodGroup || null
@@ -466,10 +469,14 @@ exports.webhookUpdate = async (req, res) => {
             phone: originalDonation.phone,
             city: originalDonation.city,
             amount: paymentDetails.amount / 100,
-            currency: paymentDetails.currency,
+            currency: paymentDetails.currency || 'INR',
             message: `Monthly recurring donation for subscription ${subscriptionDetails.id}`,
-            transactionId: paymentDetails.id, // Save unique payment ID
-            paymentStatus: 'completed'
+            subscriptionId: subscriptionDetails.id,
+            transactionId: paymentDetails.id,
+            mode: 'auto',
+            paymentStatus: 'completed',
+            isBloodDonor: originalDonation.isBloodDonor,
+            bloodGroup: originalDonation.bloodGroup
           });
 
           console.log(`Recurring donation recorded: ${recurringDonation.id} for payment ${paymentDetails.id}`);

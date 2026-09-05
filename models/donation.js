@@ -54,6 +54,14 @@ const Donation = sequelize.define('donation', {
   transactionId: {
     type: Sequelize.STRING,
     allowNull: true
+  },
+  subscriptionId: {
+    type: Sequelize.STRING,
+    allowNull: true
+  },
+  mode: {
+    type: Sequelize.STRING,
+    defaultValue: '1-time'
   }
 });
 
