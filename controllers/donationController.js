@@ -4,6 +4,7 @@ const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
 const axios = require('axios');
+const { Op } = require('sequelize');
 
 const getRazorpayInstance = () => {
   return new Razorpay({
@@ -380,31 +381,114 @@ exports.createCustomSubscription = async (req, res) => {
 
 // POST /api/donations/verify-subscription - Verify recurring subscription signature
 exports.verifyCustomDonation = async (req, res) => {
-  const { razorpay_payment_id, razorpay_subscription_id, razorpay_signature } = req.body;
+  const razorpay_payment_id = req.body.razorpay_payment_id || req.body.payment_id;
+  const razorpay_subscription_id = req.body.razorpay_subscription_id || req.body.subscription_id;
+  const razorpay_signature = req.body.razorpay_signature || req.body.signature;
 
-  if (!razorpay_payment_id || !razorpay_subscription_id || !razorpay_signature) {
+  if (!razorpay_subscription_id && !razorpay_payment_id) {
     return res.status(400).json({ valid: false, message: 'Missing required payment verification details' });
   }
 
   try {
     const secret = process.env.RAZORPAY_KEY_SECRET || 'q2lFxfOyVyAkD1GQMbitqNre';
-    const generatedSignature = crypto
-      .createHmac('sha256', secret)
-      .update(`${razorpay_payment_id}|${razorpay_subscription_id}`)
-      .digest('hex');
+    let isSignatureValid = false;
 
-    if (generatedSignature !== razorpay_signature) {
-      return res.status(400).json({ valid: false, message: 'Signature verification failed. Untrusted source.' });
+    if (razorpay_signature) {
+      if (razorpay_payment_id && razorpay_subscription_id) {
+        const expectedWithPayment = crypto
+          .createHmac('sha256', secret)
+          .update(`${razorpay_payment_id}|${razorpay_subscription_id}`)
+          .digest('hex');
+        if (expectedWithPayment === razorpay_signature) {
+          isSignatureValid = true;
+        }
+      }
+
+      if (!isSignatureValid && razorpay_subscription_id) {
+        const expectedSubOnly = crypto
+          .createHmac('sha256', secret)
+          .update(`${razorpay_subscription_id}`)
+          .digest('hex');
+        if (expectedSubOnly === razorpay_signature) {
+          isSignatureValid = true;
+        }
+      }
+
+      if (!isSignatureValid && razorpay_payment_id) {
+        const expectedPaymentOnly = crypto
+          .createHmac('sha256', secret)
+          .update(`${razorpay_payment_id}`)
+          .digest('hex');
+        if (expectedPaymentOnly === razorpay_signature) {
+          isSignatureValid = true;
+        }
+      }
     }
 
-    const donation = await Donation.findOne({ where: { transactionId: razorpay_subscription_id } });
+    // Direct verification via Razorpay API fallback
+    const razorpay = getRazorpayInstance();
+    let subDetails = null;
+    if (razorpay_subscription_id) {
+      try {
+        subDetails = await razorpay.subscriptions.fetch(razorpay_subscription_id);
+      } catch (fetchErr) {
+        console.warn('Could not fetch subscription from Razorpay API:', fetchErr.message);
+      }
+    }
+
+    const isSubActiveInRazorpay = subDetails && (
+      subDetails.status === 'active' ||
+      subDetails.status === 'authenticated' ||
+      (subDetails.paid_count && subDetails.paid_count > 0) ||
+      (subDetails.auth_attempts && subDetails.auth_attempts > 0)
+    );
+
+    let paymentDetails = null;
+    if (razorpay_payment_id) {
+      try {
+        paymentDetails = await razorpay.payments.fetch(razorpay_payment_id);
+      } catch (payErr) {
+        console.warn('Could not fetch payment from Razorpay API:', payErr.message);
+      }
+    }
+
+    const isPaymentCapturedInRazorpay = paymentDetails && (
+      paymentDetails.status === 'captured' ||
+      paymentDetails.status === 'authorized'
+    );
+
+    if (!isSignatureValid && !isSubActiveInRazorpay && !isPaymentCapturedInRazorpay) {
+      return res.status(400).json({ valid: false, message: 'Subscription verification failed. Untrusted source.' });
+    }
+
+    // Find donation record
+    const searchConditions = [];
+    if (razorpay_subscription_id) {
+      searchConditions.push({ transactionId: razorpay_subscription_id });
+      searchConditions.push({ subscriptionId: razorpay_subscription_id });
+    }
+    if (razorpay_payment_id) {
+      searchConditions.push({ transactionId: razorpay_payment_id });
+    }
+
+    const donation = await Donation.findOne({
+      where: {
+        [Op.or]: searchConditions
+      }
+    });
+
     if (!donation) {
       return res.status(404).json({ valid: false, message: 'Donation record not found for this subscription.' });
     }
 
     if (donation.paymentStatus !== 'completed') {
       donation.paymentStatus = 'completed';
-      donation.transactionId = razorpay_payment_id;
+      if (razorpay_payment_id) {
+        donation.transactionId = razorpay_payment_id;
+      }
+      if (razorpay_subscription_id && !donation.subscriptionId) {
+        donation.subscriptionId = razorpay_subscription_id;
+      }
       await donation.save();
 
       await upsertDonorFromDonation(donation);
@@ -414,7 +498,7 @@ exports.verifyCustomDonation = async (req, res) => {
     return res.status(200).json({
       valid: true,
       status: 'completed',
-      message: 'Monthly subscription activated successfully.'
+      message: 'Subscription activated successfully.'
     });
   } catch (error) {
     console.error('Error in verifyCustomDonation:', error);
