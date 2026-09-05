@@ -327,7 +327,7 @@ exports.createCustomSubscription = async (req, res) => {
 
     const planOptions = {
       period: 'daily',
-      interval: 1,
+      interval: 7,
       item: {
         name: `Daily Test Donation - ₹${parsedAmount}`,
         amount: amountInPaise,
