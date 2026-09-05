@@ -4,6 +4,7 @@ const TeamMember = require('../models/teamMemberModel');
 const News = require('../models/newsModel');
 const Review = require('../models/reviewModel');
 const admin = require('firebase-admin');
+const sharp = require('sharp');
 
 let serviceAccount;
 try {
@@ -47,35 +48,42 @@ exports.getHomeData = async (req, res) => {
   }
 };
 
-exports.uploadImage = (req, res) => {
+exports.uploadImage = async (req, res) => {
   try {
-    let fileBuffer;
-    let mimeType;
-    let filename;
+    let inputBuffer;
+    let baseName = 'upload';
 
     if (req.file) {
-      fileBuffer = req.file.buffer;
-      mimeType = req.file.mimetype;
-      filename = `${Date.now()}-${req.file.originalname.replace(/\s+/g, '_')}`;
+      inputBuffer = req.file.buffer;
+      baseName = req.file.originalname.replace(/\.[^/.]+$/, '').replace(/\s+/g, '_');
     } else if (req.body.image) {
       const matches = req.body.image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
       if (!matches || matches.length !== 3) {
         return res.status(400).send({ message: 'Invalid base64 format' });
       }
-      mimeType = matches[1];
-      fileBuffer = Buffer.from(matches[2], 'base64');
-      const ext = mimeType.split('/')[1];
-      filename = `${Date.now()}-upload.${ext}`;
+      inputBuffer = Buffer.from(matches[2], 'base64');
     } else {
       return res.status(400).send({ message: 'No file uploaded.' });
     }
 
+    // Convert image buffer to WebP format
+    let webpBuffer;
+    try {
+      webpBuffer = await sharp(inputBuffer)
+        .webp({ quality: 85 })
+        .toBuffer();
+    } catch (conversionErr) {
+      console.error('WebP conversion failed, using input buffer:', conversionErr);
+      webpBuffer = inputBuffer;
+    }
+
+    const filename = `${Date.now()}-${baseName}.webp`;
     const bucket = admin.storage().bucket();
     const file = bucket.file(filename);
 
     const stream = file.createWriteStream({
       metadata: {
-        contentType: mimeType,
+        contentType: 'image/webp',
       },
       resumable: false
     });
@@ -99,7 +107,7 @@ exports.uploadImage = (req, res) => {
       }
     });
 
-    stream.end(fileBuffer);
+    stream.end(webpBuffer);
   } catch (error) {
     res.status(500).send({ message: error.message });
   }
