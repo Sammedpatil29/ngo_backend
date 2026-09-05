@@ -4,7 +4,13 @@ const TeamMember = require('../models/teamMemberModel');
 const News = require('../models/newsModel');
 const Review = require('../models/reviewModel');
 const admin = require('firebase-admin');
-const sharp = require('sharp');
+
+let sharp;
+try {
+  sharp = require('sharp');
+} catch (err) {
+  console.warn('Warning: sharp native binary could not be loaded in this environment. Image conversion will fallback gracefully.', err && err.message);
+}
 
 let serviceAccount;
 try {
@@ -52,38 +58,49 @@ exports.uploadImage = async (req, res) => {
   try {
     let inputBuffer;
     let baseName = 'upload';
+    let extension = 'webp';
+    let contentType = 'image/webp';
 
     if (req.file) {
       inputBuffer = req.file.buffer;
       baseName = req.file.originalname.replace(/\.[^/.]+$/, '').replace(/\s+/g, '_');
+      const origExt = (req.file.originalname.split('.').pop() || 'png').toLowerCase();
+      extension = origExt;
+      contentType = req.file.mimetype || `image/${origExt}`;
     } else if (req.body.image) {
       const matches = req.body.image.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
       if (!matches || matches.length !== 3) {
         return res.status(400).send({ message: 'Invalid base64 format' });
       }
+      contentType = matches[1];
+      extension = (contentType.split('/')[1] || 'png').toLowerCase();
       inputBuffer = Buffer.from(matches[2], 'base64');
     } else {
       return res.status(400).send({ message: 'No file uploaded.' });
     }
 
-    // Convert image buffer to WebP format
-    let webpBuffer;
-    try {
-      webpBuffer = await sharp(inputBuffer)
-        .webp({ quality: 85 })
-        .toBuffer();
-    } catch (conversionErr) {
-      console.error('WebP conversion failed, using input buffer:', conversionErr);
-      webpBuffer = inputBuffer;
+    // Convert image buffer to WebP format if sharp is available
+    let outputBuffer = inputBuffer;
+    if (sharp) {
+      try {
+        outputBuffer = await sharp(inputBuffer)
+          .webp({ quality: 85 })
+          .toBuffer();
+        extension = 'webp';
+        contentType = 'image/webp';
+      } catch (conversionErr) {
+        console.warn('WebP conversion failed, falling back to original format:', conversionErr.message);
+        outputBuffer = inputBuffer;
+      }
     }
 
-    const filename = `${Date.now()}-${baseName}.webp`;
+    const filename = `${Date.now()}-${baseName}.${extension}`;
     const bucket = admin.storage().bucket();
     const file = bucket.file(filename);
 
     const stream = file.createWriteStream({
       metadata: {
-        contentType: 'image/webp',
+        contentType: contentType,
       },
       resumable: false
     });
@@ -107,7 +124,7 @@ exports.uploadImage = async (req, res) => {
       }
     });
 
-    stream.end(webpBuffer);
+    stream.end(outputBuffer);
   } catch (error) {
     res.status(500).send({ message: error.message });
   }
