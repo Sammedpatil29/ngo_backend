@@ -363,6 +363,9 @@ exports.createCustomSubscription = async (req, res) => {
       bloodGroup: bloodGroup || null
     });
 
+    // Schedule fallback status check after 5 minutes in background
+    schedulePaymentStatusCheck(subscription.id, 5 * 60 * 1000);
+
     res.status(200).json({
       success: true,
       donation: newDonation,
@@ -564,30 +567,58 @@ const sendPaymentStatusEmail = async (donation, status) => {
 };
 
 // Helper: update pending donation status from Razorpay
-const updateDonationPaymentStatus = async (orderId) => {
-  const donation = await Donation.findOne({ where: { transactionId: orderId } });
+const updateDonationPaymentStatus = async (identifier) => {
+  const { Op } = require('sequelize');
+  const donation = await Donation.findOne({
+    where: {
+      [Op.or]: [
+        { transactionId: identifier },
+        { subscriptionId: identifier }
+      ]
+    }
+  });
+
   if (!donation || donation.paymentStatus !== 'pending') return donation;
 
   try {
     const razorpay = getRazorpayInstance();
-    const order = await razorpay.orders.fetch(orderId);
     let newStatus = donation.paymentStatus;
+    const isSub = (donation.subscriptionId && donation.subscriptionId.startsWith('sub_')) ||
+                  (donation.transactionId && donation.transactionId.startsWith('sub_')) ||
+                  donation.mode === 'auto';
 
-    if (order.status === 'paid') {
-      newStatus = 'completed';
-    } else if (order.status === 'created' && order.attempts === 0) {
-      const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-      if (new Date(donation.createdAt) < fifteenMinutesAgo) {
+    if (isSub) {
+      const subId = donation.subscriptionId || donation.transactionId;
+      const subscription = await razorpay.subscriptions.fetch(subId);
+
+      if (['active', 'completed'].includes(subscription.status)) {
+        newStatus = 'completed';
+      } else if (subscription.status === 'created') {
+        const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+        if (new Date(donation.createdAt) < fifteenMinutesAgo) {
+          newStatus = 'cancelled';
+        }
+      } else if (['cancelled', 'halted', 'expired'].includes(subscription.status)) {
         newStatus = 'cancelled';
       }
     } else {
-      const payments = await razorpay.orders.fetchPayments(orderId);
-      const items = payments.items || [];
-      if (payments.count > 0) {
-        if (items.some(p => ['captured', 'authorized'].includes(p.status))) {
-          newStatus = 'completed';
-        } else if (items.some(p => ['failed', 'cancelled'].includes(p.status))) {
-          newStatus = 'failed';
+      const order = await razorpay.orders.fetch(identifier);
+      if (order.status === 'paid') {
+        newStatus = 'completed';
+      } else if (order.status === 'created' && order.attempts === 0) {
+        const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+        if (new Date(donation.createdAt) < fifteenMinutesAgo) {
+          newStatus = 'cancelled';
+        }
+      } else {
+        const payments = await razorpay.orders.fetchPayments(identifier);
+        const items = payments.items || [];
+        if (payments.count > 0) {
+          if (items.some(p => ['captured', 'authorized'].includes(p.status))) {
+            newStatus = 'completed';
+          } else if (items.some(p => ['failed', 'cancelled'].includes(p.status))) {
+            newStatus = 'failed';
+          }
         }
       }
     }
@@ -599,9 +630,10 @@ const updateDonationPaymentStatus = async (orderId) => {
       if (newStatus === 'completed') {
         await upsertDonorFromDonation(donation);
       }
+      console.log(`Donation status updated for ${identifier}: ${newStatus}`);
     }
   } catch (error) {
-    console.error(`Error updating payment status for order ${orderId}:`, error.message);
+    console.error(`Error updating payment status for ${identifier}:`, error.message);
   }
 
   return donation;
