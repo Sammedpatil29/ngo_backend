@@ -491,6 +491,44 @@ exports.verifyCustomDonation = async (req, res) => {
       }
       await donation.save();
 
+      // Capture subscription payment if in authorized state
+      if (razorpay_payment_id) {
+        try {
+          const payment = await razorpay.payments.fetch(razorpay_payment_id);
+          if (payment && payment.status === 'authorized') {
+            const amountToCapture = payment.amount || Math.round(donation.amount * 100);
+            const currencyToCapture = payment.currency || donation.currency || 'INR';
+            await razorpay.payments.capture(razorpay_payment_id, amountToCapture, currencyToCapture);
+            console.log(`[Subscription] Captured authorized payment ${razorpay_payment_id} (${amountToCapture} ${currencyToCapture})`);
+          }
+        } catch (captureErr) {
+          console.warn('Subscription payment capture error/note:', captureErr.message);
+        }
+      } else if (razorpay_subscription_id) {
+        // If payment_id was not directly in request body, inspect subscription invoices to capture authorized payments
+        try {
+          const invoices = await razorpay.invoices.all({ subscription_id: razorpay_subscription_id, count: 5 });
+          if (invoices && invoices.items && invoices.items.length > 0) {
+            for (const inv of invoices.items) {
+              if (inv.payment_id) {
+                const invPayment = await razorpay.payments.fetch(inv.payment_id);
+                if (invPayment && invPayment.status === 'authorized') {
+                  await razorpay.payments.capture(inv.payment_id, invPayment.amount, invPayment.currency || 'INR');
+                  console.log(`[Subscription] Captured authorized invoice payment ${inv.payment_id}`);
+                  donation.transactionId = inv.payment_id;
+                  await donation.save();
+                } else if (invPayment && invPayment.status === 'captured') {
+                  donation.transactionId = inv.payment_id;
+                  await donation.save();
+                }
+              }
+            }
+          }
+        } catch (invErr) {
+          console.warn('Could not inspect subscription invoices for capture:', invErr.message);
+        }
+      }
+
       await upsertDonorFromDonation(donation);
       sendThankYouEmail(donation).catch(err => console.error('Email send failed:', err));
     }
@@ -534,6 +572,17 @@ exports.webhookUpdate = async (req, res) => {
       if (eventData.payload && eventData.payload.subscription && eventData.payload.payment) {
         const subscriptionDetails = eventData.payload.subscription.entity;
         const paymentDetails = eventData.payload.payment.entity;
+        const razorpay = getRazorpayInstance();
+
+        // Capture payment if authorized
+        if (paymentDetails && paymentDetails.status === 'authorized') {
+          try {
+            await razorpay.payments.capture(paymentDetails.id, paymentDetails.amount, paymentDetails.currency || 'INR');
+            console.log(`[Webhook] Captured authorized payment ${paymentDetails.id} for subscription ${subscriptionDetails.id}`);
+          } catch (capErr) {
+            console.warn('[Webhook] Error capturing authorized subscription payment:', capErr.message);
+          }
+        }
 
         const subscriptionCreationTime = subscriptionDetails.created_at * 1000;
         const timeDifferenceInHours = (Date.now() - subscriptionCreationTime) / (1000 * 60 * 60);
@@ -677,6 +726,19 @@ const updateDonationPaymentStatus = async (identifier) => {
 
       if (['active', 'completed'].includes(subscription.status)) {
         newStatus = 'completed';
+
+        // Check if any associated payment is authorized and capture it
+        if (donation.transactionId && donation.transactionId.startsWith('pay_')) {
+          try {
+            const payment = await razorpay.payments.fetch(donation.transactionId);
+            if (payment && payment.status === 'authorized') {
+              await razorpay.payments.capture(donation.transactionId, payment.amount, payment.currency || 'INR');
+              console.log(`[Status Check] Captured authorized payment ${donation.transactionId} for subscription ${subId}`);
+            }
+          } catch (payCapErr) {
+            console.warn('[Status Check] Error capturing subscription payment:', payCapErr.message);
+          }
+        }
       } else if (subscription.status === 'created') {
         const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
         if (new Date(donation.createdAt) < fifteenMinutesAgo) {
