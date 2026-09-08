@@ -327,13 +327,13 @@ exports.createCustomSubscription = async (req, res) => {
     const amountInPaise = Math.round(parsedAmount * 100);
 
     const planOptions = {
-      period: 'daily',
-      interval: 7,
+      period: 'monthly',
+      interval: 1,
       item: {
-        name: `Daily Test Donation - ₹${parsedAmount}`,
+        name: `Monthly Donation - ₹${parsedAmount}`,
         amount: amountInPaise,
         currency: currency || 'INR',
-        description: 'Daily Recurring Donation to May I Help You Foundation (Test)'
+        description: 'Monthly Recurring Donation to May I Help You Foundation'
       }
     };
 
@@ -341,7 +341,7 @@ exports.createCustomSubscription = async (req, res) => {
 
     const subscriptionOptions = {
       plan_id: dynamicPlan.id,
-      total_count: 3,
+      total_count: 360,
       quantity: 1,
       customer_notify: 1
     };
