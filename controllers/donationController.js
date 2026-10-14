@@ -185,13 +185,67 @@ exports.getAllDonations = async (req, res) => {
     const monthFromTimestamp = Math.floor(monthStart.getTime() / 1000);
     const yearFromTimestamp = Math.floor(yearStart.getTime() / 1000);
 
-    const [todayPayments, weekPayments, monthPayments, yearPayments, allSubscriptions, allPlans, balanceResponse] = await Promise.all([
+    // Helper to fetch all active subscriptions using pagination (default Razorpay count is only 10)
+    const fetchAllActiveSubscriptions = async () => {
+      const activeSubs = [];
+      let skip = 0;
+      const count = 100;
+      let hasMore = true;
+
+      while (hasMore) {
+        try {
+          const res = await razorpay.subscriptions.all({ count, skip });
+          const items = (res && res.items) || [];
+          for (const sub of items) {
+            if (sub.status === 'active') {
+              activeSubs.push(sub);
+            }
+          }
+          if (items.length < count) {
+            hasMore = false;
+          } else {
+            skip += count;
+          }
+        } catch (err) {
+          console.warn('Error fetching subscriptions page:', (err && err.error && err.error.description) || (err && err.message) || err);
+          hasMore = false;
+        }
+      }
+      return activeSubs;
+    };
+
+    // Helper to fetch all plans using pagination to map plan_id to amount
+    const fetchAllPlans = async () => {
+      const plans = [];
+      let skip = 0;
+      const count = 100;
+      let hasMore = true;
+
+      while (hasMore) {
+        try {
+          const res = await razorpay.plans.all({ count, skip });
+          const items = (res && res.items) || [];
+          plans.push(...items);
+          if (items.length < count) {
+            hasMore = false;
+          } else {
+            skip += count;
+          }
+        } catch (err) {
+          console.warn('Error fetching plans page:', (err && err.error && err.error.description) || (err && err.message) || err);
+          hasMore = false;
+        }
+      }
+      return plans;
+    };
+
+    const [todayPayments, weekPayments, monthPayments, yearPayments, activeSubscriptions, allPlans, balanceResponse] = await Promise.all([
       razorpay.payments.all({ from: todayFromTimestamp, to: toTimestamp, count: 100 }).catch(() => ({ items: [] })),
       razorpay.payments.all({ from: weekFromTimestamp, to: toTimestamp, count: 100 }).catch(() => ({ items: [] })),
       razorpay.payments.all({ from: monthFromTimestamp, to: toTimestamp, count: 100 }).catch(() => ({ items: [] })),
       razorpay.payments.all({ from: yearFromTimestamp, to: toTimestamp, count: 100 }).catch(() => ({ items: [] })),
-      razorpay.subscriptions.all().catch(() => ({ items: [] })),
-      razorpay.plans.all().catch(() => ({ items: [] })),
+      fetchAllActiveSubscriptions(),
+      fetchAllPlans(),
       axios.get('https://api.razorpay.com/v1/balance', {
         auth: {
           username: process.env.RAZORPAY_KEY_ID || 'rzp_test_S5RLYqr6y2I6xs',
@@ -208,15 +262,14 @@ exports.getAllDonations = async (req, res) => {
     };
 
     const planAmountMap = new Map();
-    if (allPlans && allPlans.items) {
-      allPlans.items.forEach(plan => {
-        planAmountMap.set(plan.id, plan.item.amount);
+    if (allPlans && Array.isArray(allPlans)) {
+      allPlans.forEach(plan => {
+        if (plan && plan.id && plan.item) {
+          planAmountMap.set(plan.id, plan.item.amount);
+        }
       });
     }
 
-    const activeSubscriptions = allSubscriptions && allSubscriptions.items
-      ? allSubscriptions.items.filter(sub => sub.status === 'active')
-      : [];
     const activeSubscriptionsCount = activeSubscriptions.length;
     const activeSubscriptionsTotal = activeSubscriptions
       .reduce((sum, sub) => sum + (planAmountMap.get(sub.plan_id) || 0), 0) / 100;
