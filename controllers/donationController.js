@@ -366,6 +366,125 @@ exports.checkPaymentStatus = async (req, res) => {
   }
 };
 
+// GET /api/donations/subscriptions - Fetch all subscriptions from Razorpay with full status and plan details
+exports.getAllSubscriptions = async (req, res) => {
+  try {
+    const razorpay = getRazorpayInstance();
+    const allSubscriptions = [];
+    const allPlans = [];
+
+    // 1. Paginate and fetch all subscriptions (all statuses: active, created, authenticated, paused, cancelled, halted, expired, completed)
+    let subSkip = 0;
+    const subCount = 100;
+    let hasMoreSubs = true;
+
+    while (hasMoreSubs) {
+      try {
+        const subRes = await razorpay.subscriptions.all({ count: subCount, skip: subSkip });
+        const items = (subRes && subRes.items) || [];
+        allSubscriptions.push(...items);
+        if (items.length < subCount) {
+          hasMoreSubs = false;
+        } else {
+          subSkip += subCount;
+        }
+      } catch (err) {
+        console.warn('Error fetching subscriptions page:', (err && err.error && err.error.description) || (err && err.message) || err);
+        hasMoreSubs = false;
+      }
+    }
+
+    // 2. Paginate and fetch all plans to map plan details & amounts
+    let planSkip = 0;
+    const planCount = 100;
+    let hasMorePlans = true;
+
+    while (hasMorePlans) {
+      try {
+        const planRes = await razorpay.plans.all({ count: planCount, skip: planSkip });
+        const items = (planRes && planRes.items) || [];
+        allPlans.push(...items);
+        if (items.length < planCount) {
+          hasMorePlans = false;
+        } else {
+          planSkip += planCount;
+        }
+      } catch (err) {
+        console.warn('Error fetching plans page:', (err && err.error && err.error.description) || (err && err.message) || err);
+        hasMorePlans = false;
+      }
+    }
+
+    const planMap = new Map();
+    allPlans.forEach(p => {
+      if (p && p.id) {
+        planMap.set(p.id, p);
+      }
+    });
+
+    // 3. Match with local donations table to correlate donor details if available
+    const subscriptionIds = allSubscriptions.map(s => s.id);
+    const localDonations = await Donation.findAll({
+      where: {
+        [Op.or]: [
+          { subscriptionId: subscriptionIds },
+          { transactionId: subscriptionIds }
+        ]
+      }
+    });
+
+    const localMap = new Map();
+    localDonations.forEach(d => {
+      const key = d.subscriptionId || d.transactionId;
+      if (key && !localMap.has(key)) {
+        localMap.set(key, d);
+      }
+    });
+
+    const enrichedSubscriptions = allSubscriptions.map(sub => {
+      const plan = planMap.get(sub.plan_id) || null;
+      const local = localMap.get(sub.id) || null;
+      const planItem = plan ? plan.item : null;
+      const amount = planItem ? planItem.amount / 100 : (local ? local.amount : 0);
+      const currency = planItem ? planItem.currency : (local ? local.currency : 'INR');
+
+      return {
+        id: sub.id,
+        plan_id: sub.plan_id,
+        status: sub.status, // active, created, authenticated, completed, cancelled, halted, expired, etc.
+        amount,
+        currency,
+        planName: planItem ? planItem.name : `Plan ${sub.plan_id}`,
+        period: plan ? plan.period : null,
+        interval: plan ? plan.interval : null,
+        total_count: sub.total_count,
+        paid_count: sub.paid_count,
+        remaining_count: sub.remaining_count,
+        auth_attempts: sub.auth_attempts,
+        current_start: sub.current_start ? new Date(sub.current_start * 1000) : null,
+        current_end: sub.current_end ? new Date(sub.current_end * 1000) : null,
+        charge_at: sub.charge_at ? new Date(sub.charge_at * 1000) : null,
+        start_at: sub.start_at ? new Date(sub.start_at * 1000) : null,
+        end_at: sub.end_at ? new Date(sub.end_at * 1000) : null,
+        created_at: sub.created_at ? new Date(sub.created_at * 1000) : null,
+        donorName: local ? local.donorName : (sub.notes ? sub.notes.donorName : null),
+        phone: local ? local.phone : (sub.notes ? sub.notes.phone : null),
+        email: local ? local.email : (sub.notes ? sub.notes.email : null),
+        city: local ? local.city : (sub.notes ? sub.notes.city : null)
+      };
+    });
+
+    res.status(200).json({
+      success: true,
+      count: enrichedSubscriptions.length,
+      subscriptions: enrichedSubscriptions
+    });
+  } catch (error) {
+    console.error('Error fetching all subscriptions:', error);
+    res.status(500).json({ success: false, error: 'Failed to fetch subscriptions', details: error.message });
+  }
+};
+
 // POST /api/donations/subscribe-custom - Create recurring subscription plan & session
 exports.createCustomSubscription = async (req, res) => {
   try {
