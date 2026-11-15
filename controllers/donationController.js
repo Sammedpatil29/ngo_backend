@@ -1,5 +1,6 @@
 const Donation = require('../models/donation');
 const Donor = require('../models/donor');
+const sequelize = require('../database');
 const Razorpay = require('razorpay');
 const crypto = require('crypto');
 const nodemailer = require('nodemailer');
@@ -167,10 +168,61 @@ exports.verifyPayment = async (req, res) => {
   }
 };
 
-// GET /api/donations - Get all donations and live Razorpay stats
+// GET /api/donations - Get paginated donations from local DB and live paginated Razorpay stats
 exports.getAllDonations = async (req, res) => {
   try {
-    const donations = await Donation.findAll({ order: [['createdAt', 'DESC']] });
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit, 10) || 10);
+    const offset = (page - 1) * limit;
+    const search = (req.query.search || '').trim();
+    const includeStats = req.query.includeStats !== 'false';
+
+    const whereClause = {};
+    if (search) {
+      const term = search.toLowerCase();
+      const likePattern = `%${term}%`;
+      const searchConditions = [
+        sequelize.where(sequelize.fn('LOWER', sequelize.col('donorName')), { [Op.like]: likePattern }),
+        sequelize.where(sequelize.fn('LOWER', sequelize.col('email')), { [Op.like]: likePattern }),
+        sequelize.where(sequelize.fn('LOWER', sequelize.col('phone')), { [Op.like]: likePattern }),
+        sequelize.where(sequelize.fn('LOWER', sequelize.col('city')), { [Op.like]: likePattern }),
+        sequelize.where(sequelize.fn('LOWER', sequelize.col('mode')), { [Op.like]: likePattern }),
+        sequelize.where(sequelize.fn('LOWER', sequelize.col('transactionId')), { [Op.like]: likePattern }),
+        sequelize.where(sequelize.fn('LOWER', sequelize.col('subscriptionId')), { [Op.like]: likePattern }),
+        sequelize.where(sequelize.fn('LOWER', sequelize.cast(sequelize.col('paymentStatus'), 'TEXT')), { [Op.like]: likePattern }),
+        sequelize.where(sequelize.cast(sequelize.col('amount'), 'TEXT'), { [Op.like]: likePattern })
+      ];
+
+      if (['auto', 'autopay', 'subscription'].includes(term)) {
+        searchConditions.push({ mode: 'auto' });
+        searchConditions.push(sequelize.where(sequelize.fn('LOWER', sequelize.col('transactionId')), { [Op.like]: 'sub%' }));
+      } else if (['one-time', 'onetime', '1-time'].includes(term)) {
+        searchConditions.push({ mode: '1-time' });
+      }
+
+      whereClause[Op.or] = searchConditions;
+    }
+
+    const dbQueryPromise = Donation.findAndCountAll({
+      where: whereClause,
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset
+    });
+
+    if (!includeStats) {
+      const { count: total, rows: donations } = await dbQueryPromise;
+      return res.json({
+        donations,
+        pagination: {
+          total,
+          page,
+          limit,
+          totalPages: Math.ceil(total / limit) || 1
+        }
+      });
+    }
+
     const razorpay = getRazorpayInstance();
 
     const now = new Date();
@@ -184,6 +236,42 @@ exports.getAllDonations = async (req, res) => {
     const weekFromTimestamp = Math.floor(weekStart.getTime() / 1000);
     const monthFromTimestamp = Math.floor(monthStart.getTime() / 1000);
     const yearFromTimestamp = Math.floor(yearStart.getTime() / 1000);
+    const earliestFromTimestamp = Math.min(
+      todayFromTimestamp,
+      weekFromTimestamp,
+      monthFromTimestamp,
+      yearFromTimestamp
+    );
+
+    // Helper to fetch all payments in a time range using pagination (Razorpay max count per call is 100)
+    const fetchAllPayments = async (fromTimestamp, toTs) => {
+      const payments = [];
+      let skip = 0;
+      const count = 100;
+      let hasMore = true;
+
+      while (hasMore) {
+        try {
+          const res = await razorpay.payments.all({
+            from: fromTimestamp,
+            to: toTs,
+            count,
+            skip
+          });
+          const items = (res && res.items) || [];
+          payments.push(...items);
+          if (items.length < count) {
+            hasMore = false;
+          } else {
+            skip += count;
+          }
+        } catch (err) {
+          console.warn('Error fetching payments page:', (err && err.error && err.error.description) || (err && err.message) || err);
+          hasMore = false;
+        }
+      }
+      return payments;
+    };
 
     // Helper to fetch all active subscriptions using pagination (default Razorpay count is only 10)
     const fetchAllActiveSubscriptions = async () => {
@@ -239,11 +327,9 @@ exports.getAllDonations = async (req, res) => {
       return plans;
     };
 
-    const [todayPayments, weekPayments, monthPayments, yearPayments, activeSubscriptions, allPlans, balanceResponse] = await Promise.all([
-      razorpay.payments.all({ from: todayFromTimestamp, to: toTimestamp, count: 100 }).catch(() => ({ items: [] })),
-      razorpay.payments.all({ from: weekFromTimestamp, to: toTimestamp, count: 100 }).catch(() => ({ items: [] })),
-      razorpay.payments.all({ from: monthFromTimestamp, to: toTimestamp, count: 100 }).catch(() => ({ items: [] })),
-      razorpay.payments.all({ from: yearFromTimestamp, to: toTimestamp, count: 100 }).catch(() => ({ items: [] })),
+    const [dbResult, allPeriodPayments, activeSubscriptions, allPlans, balanceResponse] = await Promise.all([
+      dbQueryPromise,
+      fetchAllPayments(earliestFromTimestamp, toTimestamp),
       fetchAllActiveSubscriptions(),
       fetchAllPlans(),
       axios.get('https://api.razorpay.com/v1/balance', {
@@ -254,11 +340,15 @@ exports.getAllDonations = async (req, res) => {
       }).catch(() => ({ data: { balance: 0 } }))
     ]);
 
-    const calculateTotal = (payments) => {
-      if (!payments || !payments.items) return 0;
-      return payments.items
-        .filter(p => p.status === 'captured')
-        .reduce((sum, p) => sum + p.amount, 0) / 100;
+    const capturedPayments = (allPeriodPayments || []).filter(p => p && p.status === 'captured');
+
+    const computePeriodMetrics = (fromTimestamp) => {
+      const matching = capturedPayments.filter(p => p.created_at >= fromTimestamp);
+      const total = matching.reduce((sum, p) => sum + (p.amount || 0), 0) / 100;
+      return {
+        total,
+        count: matching.length
+      };
     };
 
     const planAmountMap = new Map();
@@ -275,22 +365,10 @@ exports.getAllDonations = async (req, res) => {
       .reduce((sum, sub) => sum + (planAmountMap.get(sub.plan_id) || 0), 0) / 100;
 
     const razorpayStats = {
-      today: {
-        total: calculateTotal(todayPayments),
-        count: (todayPayments.items || []).filter(p => p.status === 'captured').length
-      },
-      lastWeek: {
-        total: calculateTotal(weekPayments),
-        count: (weekPayments.items || []).filter(p => p.status === 'captured').length
-      },
-      thisMonth: {
-        total: calculateTotal(monthPayments),
-        count: (monthPayments.items || []).filter(p => p.status === 'captured').length
-      },
-      thisYear: {
-        total: calculateTotal(yearPayments),
-        count: (yearPayments.items || []).filter(p => p.status === 'captured').length
-      },
+      today: computePeriodMetrics(todayFromTimestamp),
+      lastWeek: computePeriodMetrics(weekFromTimestamp),
+      thisMonth: computePeriodMetrics(monthFromTimestamp),
+      thisYear: computePeriodMetrics(yearFromTimestamp),
       activeSubscriptions: {
         total: activeSubscriptionsTotal,
         count: activeSubscriptionsCount
@@ -298,7 +376,18 @@ exports.getAllDonations = async (req, res) => {
       balance: (balanceResponse.data.balance || 0) / 100
     };
 
-    res.json({ donations, razorpayStats });
+    const { count: total, rows: donations } = dbResult;
+
+    res.json({
+      donations,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit) || 1
+      },
+      razorpayStats
+    });
   } catch (error) {
     console.error('Error fetching donations and stats:', error);
     res.status(500).json({ error: 'Failed to fetch donations and stats', details: error.message });
